@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { processSale, getReceiptData, type CartLine } from "./actions";
 import { printReceiptWindow } from "./receipt";
+import { linkQuotationToSale } from "../quotations/actions";
 
 type Product = {
   id: number;
@@ -41,6 +42,38 @@ type Line = {
 
 let nextKey = 1;
 
+export type InitialLine = {
+  productId: number;
+  name: string;
+  unit: string;
+  unitsPerBox: number;
+  stock: number;
+  type: "regular" | "bulk";
+  costPrice: number;
+  sellUnit: number;
+  qty: number;
+};
+
+function buildLinesFromInitial(initialLines?: InitialLine[]): Line[] {
+  if (!initialLines?.length) return [];
+  return initialLines.map((it) => ({
+    key: nextKey++,
+    productId: it.productId,
+    name: it.name,
+    unit: it.unit,
+    unitsPerBox: it.unitsPerBox,
+    stock: it.stock,
+    type: it.type,
+    costPrice: it.costPrice,
+    sellUnit: it.sellUnit,
+    sellBox: null,
+    sellAs: "unit",
+    qty: String(it.qty),
+    costMode: false,
+    markupPercent: "",
+  }));
+}
+
 export default function PosClient({
   products,
   customers,
@@ -49,6 +82,8 @@ export default function PosClient({
   storeName,
   storeAddress,
   storePhone,
+  initialLines,
+  quotationId,
 }: {
   products: Product[];
   customers: Customer[];
@@ -57,10 +92,12 @@ export default function PosClient({
   storeName: string;
   storeAddress: string;
   storePhone: string;
+  initialLines?: InitialLine[];
+  quotationId?: number | null;
 }) {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
-  const [lines, setLines] = useState<Line[]>([]);
+  const [lines, setLines] = useState<Line[]>(() => buildLinesFromInitial(initialLines));
   const [customerId, setCustomerId] = useState("");
   const [discount, setDiscount] = useState("0");
   const [creditUse, setCreditUse] = useState("0");
@@ -188,6 +225,7 @@ export default function PosClient({
 
     try {
       const result = await processSale(fd);
+      if (quotationId) await linkQuotationToSale(quotationId, result.saleId);
       setLastSaleId(result.saleId);
       setLastReceipt(result.receipt);
       setLines([]);
