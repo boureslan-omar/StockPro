@@ -106,7 +106,7 @@ export default function POForm({ suppliers }: { suppliers: Supplier[] }) {
         + New Purchase Order
       </button>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="New Purchase Order">
+      <Modal open={open} onClose={() => setOpen(false)} title="New Purchase Order" width="3xl">
         <form
           action={async (fd) => {
             try {

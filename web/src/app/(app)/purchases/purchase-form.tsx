@@ -72,7 +72,7 @@ export default function PurchaseForm({ suppliers, categories }: { suppliers: Sup
         + New Purchase
       </button>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="New Purchase">
+      <Modal open={open} onClose={() => setOpen(false)} title="New Purchase" width="3xl">
         <form
           action={async (fd) => {
             try {

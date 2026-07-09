@@ -71,7 +71,7 @@ export default function ReceivePO({ poId, poNumber }: { poId: number; poNumber: 
         Receive
       </button>
 
-      <Modal open={open} onClose={() => setOpen(false)} title={`Receive PO — ${poNumber}`}>
+      <Modal open={open} onClose={() => setOpen(false)} title={`Receive PO — ${poNumber}`} width="3xl">
         {loading ? (
           <p className="text-sm text-zinc-500">Loading…</p>
         ) : (
