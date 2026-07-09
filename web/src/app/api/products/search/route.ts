@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("products")
-    .select("id, barcode, name, unit, stock, cost_price, sell_price, product_type")
+    .select("id, barcode, name, unit, stock, cost_price, sell_price, product_type, product_source, track_expiry")
     .or(`name.ilike.%${q}%,barcode.ilike.%${q}%`)
     .order("name")
     .limit(10);

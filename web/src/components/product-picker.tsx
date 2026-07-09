@@ -11,6 +11,8 @@ export type PickedProduct = {
   cost_price: number;
   sell_price: number;
   product_type: string;
+  product_source: string;
+  track_expiry: boolean;
 };
 
 export default function ProductPicker({

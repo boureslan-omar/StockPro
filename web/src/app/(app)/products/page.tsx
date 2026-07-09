@@ -20,7 +20,7 @@ export default async function ProductsPage() {
   const { data: products, error } = await supabase
     .from("products")
     .select(
-      "id, barcode, name, product_type, cost_price, sell_price, stock, low_stock_alert, unit, categories(name), suppliers(name)"
+      "id, barcode, name, product_type, cost_price, sell_price, stock, low_stock_alert, unit, categories(name), suppliers!products_supplier_id_fkey(name)"
     )
     .order("name");
 
