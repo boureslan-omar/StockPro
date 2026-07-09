@@ -91,11 +91,11 @@ export default function LoginPage() {
     <main className="relative min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950 px-4 overflow-hidden">
       {/* Fixed brand background — always the StockPro mark, regardless of any
           per-organization logo customization applied elsewhere in the app.
-          Tiled so the whole viewport reads as branded, not just one faded
-          center image; the card in front stays opaque enough to stay legible. */}
+          One single image, not tiled — sized to cover the viewport without
+          repeating, kept behind a solid card so the form stays fully legible. */}
       <div
         className="absolute inset-0 pointer-events-none select-none opacity-[0.15] dark:opacity-20"
-        style={{ backgroundImage: "url(/logo.png)", backgroundRepeat: "repeat", backgroundSize: "360px auto" }}
+        style={{ backgroundImage: "url(/logo.png)", backgroundRepeat: "no-repeat", backgroundPosition: "center", backgroundSize: "cover" }}
       />
 
       <div className="relative w-full max-w-sm rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-8 shadow-lg">
