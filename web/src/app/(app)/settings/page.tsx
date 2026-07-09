@@ -1,10 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { getSettings } from "@/lib/settings";
-import { saveSettings } from "./actions";
+import { saveSettings, getBackupInfo } from "./actions";
+import BackupButton from "./backup-button";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
   const s = await getSettings(supabase);
+  const backup = await getBackupInfo();
 
   return (
     <div className="max-w-2xl">
@@ -119,6 +121,24 @@ export default async function SettingsPage() {
           Save Settings
         </button>
       </form>
+
+      <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 mt-6">
+        <h2 className="text-sm font-semibold text-zinc-500 mb-4">DATA BACKUP</h2>
+        <p className="text-sm text-zinc-500 mb-3">
+          A snapshot of your data (products, sales, purchases, customers, etc.) is backed up automatically every day, and the last 14 days are
+          kept. You can also trigger one manually.
+        </p>
+        <div className="flex items-center gap-4">
+          <BackupButton />
+          {backup ? (
+            <a href={backup.url ?? "#"} className="text-sm text-blue-600 hover:underline">
+              Download latest backup ({backup.updatedAt ? new Date(backup.updatedAt).toLocaleString() : backup.name})
+            </a>
+          ) : (
+            <span className="text-sm text-zinc-500">No backup yet.</span>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
