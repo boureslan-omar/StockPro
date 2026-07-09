@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import AuditForm from "./audit-form";
 import ApplyButton from "./apply-button";
+import ConfirmDeleteButton from "@/components/confirm-delete-button";
 import { deleteAudit } from "./actions";
 
 const STATUS_STYLE: Record<string, string> = {
@@ -182,23 +183,15 @@ export default async function AuditsPage({
                     View
                   </Link>
                   {a.status !== "applied" && (
-                    <form
+                    <ConfirmDeleteButton
+                      confirmText="Delete this audit?"
                       action={async () => {
                         "use server";
                         await deleteAudit(a.id);
                       }}
-                      className="inline"
                     >
-                      <button
-                        type="submit"
-                        onClick={(e) => {
-                          if (!confirm("Delete this audit?")) e.preventDefault();
-                        }}
-                        className="text-red-600 hover:underline text-xs"
-                      >
-                        Delete
-                      </button>
-                    </form>
+                      Delete
+                    </ConfirmDeleteButton>
                   )}
                 </td>
               </tr>

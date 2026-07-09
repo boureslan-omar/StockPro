@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import POForm from "./po-form";
 import ReceivePO from "./receive-po";
 import StatusSelect from "./status-select";
+import ConfirmDeleteButton from "@/components/confirm-delete-button";
 import { deletePO } from "./actions";
 
 const TABS = [
@@ -90,23 +91,16 @@ export default async function PurchaseOrdersPage({
                         View purchase
                       </Link>
                     )}
-                    <form
+                    <ConfirmDeleteButton
+                      confirmText="Delete this PO?"
+                      className="text-red-600 hover:underline text-xs ml-2"
                       action={async () => {
                         "use server";
                         await deletePO(po.id);
                       }}
-                      className="inline ml-2"
                     >
-                      <button
-                        type="submit"
-                        onClick={(e) => {
-                          if (!confirm("Delete this PO?")) e.preventDefault();
-                        }}
-                        className="text-red-600 hover:underline text-xs"
-                      >
-                        Delete
-                      </button>
-                    </form>
+                      Delete
+                    </ConfirmDeleteButton>
                   </td>
                 </tr>
               );

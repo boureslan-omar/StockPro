@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { fmtUSD } from "@/lib/format";
 import PurchaseForm from "./purchase-form";
 import ViewPurchase from "./view-purchase";
+import ConfirmDeleteButton from "@/components/confirm-delete-button";
 import { deletePurchase } from "./actions";
 
 export default async function PurchasesPage() {
@@ -54,23 +55,15 @@ export default async function PurchasesPage() {
                   <td className="px-4 py-2.5 text-xs text-zinc-500">{p.note || "—"}</td>
                   <td className="px-4 py-2.5 whitespace-nowrap">
                     <ViewPurchase purchaseId={p.id} label={label} />
-                    <form
+                    <ConfirmDeleteButton
+                      confirmText="Delete? Stock will be reversed."
                       action={async () => {
                         "use server";
                         await deletePurchase(p.id);
                       }}
-                      className="inline"
                     >
-                      <button
-                        type="submit"
-                        onClick={(e) => {
-                          if (!confirm("Delete? Stock will be reversed.")) e.preventDefault();
-                        }}
-                        className="text-red-600 hover:underline text-xs"
-                      >
-                        Delete
-                      </button>
-                    </form>
+                      Delete
+                    </ConfirmDeleteButton>
                   </td>
                 </tr>
               );
