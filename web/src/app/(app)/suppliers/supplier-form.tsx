@@ -125,6 +125,7 @@ export default function SuppliersClient({
 
       <Modal open={open} onClose={() => setOpen(false)} title={editing ? "Edit Supplier" : "Add Supplier"}>
         <form
+          key={editing?.id ?? "new"}
           action={async (fd) => {
             try {
               await saveSupplier(fd);

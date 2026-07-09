@@ -125,6 +125,7 @@ export default function CustomersClient({
 
       <Modal open={open} onClose={() => setOpen(false)} title={editing ? "Edit Customer" : "Add Customer"}>
         <form
+          key={editing?.id ?? "new"}
           action={async (fd) => {
             try {
               await saveCustomer(fd);
