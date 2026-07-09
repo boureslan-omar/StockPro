@@ -1,34 +1,57 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, ShoppingCart, FileText, Package, Truck, ClipboardList,
   Building2, Users, RotateCcw, Trash2, ClipboardCheck, Receipt, Wallet,
-  BarChart3, Settings, Menu, X, Bell,
+  BarChart3, Settings, Menu, X, Bell, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import LogoutButton from "@/components/logout-button";
 import OrgSwitcher from "./org-switcher";
 import type { Membership } from "./org-actions";
 
-const NAV = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/pos", label: "POS", icon: ShoppingCart },
-  { href: "/quotations", label: "Quotations", icon: FileText },
-  { href: "/products", label: "Products", icon: Package },
-  { href: "/purchases", label: "Purchases", icon: Truck },
-  { href: "/purchase-orders", label: "Purchase Orders", icon: ClipboardList },
-  { href: "/suppliers", label: "Suppliers", icon: Building2 },
-  { href: "/customers", label: "Customers", icon: Users },
-  { href: "/returns", label: "Returns", icon: RotateCcw },
-  { href: "/wastage", label: "Wastage", icon: Trash2 },
-  { href: "/audits", label: "Audits", icon: ClipboardCheck },
-  { href: "/expenses", label: "Expenses", icon: Receipt },
-  { href: "/cash-register", label: "Cash Register", icon: Wallet },
-  { href: "/reports", label: "Reports", icon: BarChart3 },
-  { href: "/settings", label: "Settings", icon: Settings },
+const NAV_SECTIONS = [
+  {
+    label: "Overview",
+    items: [{ href: "/", label: "Dashboard", icon: LayoutDashboard }],
+  },
+  {
+    label: "Sales",
+    items: [
+      { href: "/pos", label: "POS", icon: ShoppingCart },
+      { href: "/quotations", label: "Quotations", icon: FileText },
+      { href: "/customers", label: "Customers", icon: Users },
+      { href: "/returns", label: "Returns", icon: RotateCcw },
+    ],
+  },
+  {
+    label: "Inventory",
+    items: [
+      { href: "/products", label: "Products", icon: Package },
+      { href: "/purchases", label: "Purchases", icon: Truck },
+      { href: "/purchase-orders", label: "Purchase Orders", icon: ClipboardList },
+      { href: "/suppliers", label: "Suppliers", icon: Building2 },
+      { href: "/wastage", label: "Wastage", icon: Trash2 },
+      { href: "/audits", label: "Audits", icon: ClipboardCheck },
+    ],
+  },
+  {
+    label: "Finance",
+    items: [
+      { href: "/expenses", label: "Expenses", icon: Receipt },
+      { href: "/cash-register", label: "Cash Register", icon: Wallet },
+      { href: "/reports", label: "Reports", icon: BarChart3 },
+    ],
+  },
+  {
+    label: "System",
+    items: [{ href: "/settings", label: "Settings", icon: Settings }],
+  },
 ];
+
+const COLLAPSE_KEY = "stockpro-sidebar-collapsed";
 
 export default function AppShell({
   children,
@@ -49,54 +72,98 @@ export default function AppShell({
 }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setCollapsed(localStorage.getItem(COLLAPSE_KEY) === "1");
+    setMounted(true);
+  }, []);
+
+  function toggleCollapsed() {
+    setCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem(COLLAPSE_KEY, next ? "1" : "0");
+      return next;
+    });
+  }
+
+  const sidebarWidth = collapsed ? "md:w-16" : "md:w-60";
+  const contentPad = collapsed ? "md:pl-16" : "md:pl-60";
 
   return (
     <div className="min-h-screen flex bg-zinc-50 dark:bg-zinc-950">
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-60 bg-[#111c42] text-white flex flex-col transition-transform md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 w-60 relative ${
+          mounted ? sidebarWidth : ""
+        } bg-[#111c42] text-white flex flex-col transition-[transform,width] duration-200 md:translate-x-0 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex items-center gap-2 px-4 h-16 border-b border-white/10">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-400 to-blue-600 font-bold text-sm shadow-sm shadow-blue-500/50">
+        <div className="flex items-center gap-2 px-4 h-16 border-b border-white/10 shrink-0">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-400 to-blue-600 font-bold text-sm shadow-sm shadow-blue-500/50">
             S
           </span>
-          <span className="font-bold text-lg">StockPro</span>
+          {!collapsed && <span className="font-bold text-lg truncate">StockPro</span>}
           <button onClick={() => setMobileOpen(false)} className="ml-auto md:hidden text-white/60 hover:text-white">
             <X className="h-5 w-5" />
           </button>
         </div>
-        <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
-          {NAV.map((item) => {
-            const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setMobileOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition ${
-                  active ? "bg-blue-500 text-white shadow-sm shadow-blue-500/40" : "text-white/70 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span className="truncate">{item.label}</span>
-              </Link>
-            );
-          })}
+
+        <nav className={`flex-1 overflow-y-auto overflow-x-hidden py-4 px-2 ${collapsed ? "space-y-2" : "space-y-5"}`}>
+          {NAV_SECTIONS.map((section, i) => (
+            <div key={section.label}>
+              {collapsed ? (
+                i > 0 && <div className="mx-2 mb-2 border-t border-white/10" />
+              ) : (
+                <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/35">{section.label}</p>
+              )}
+              <div className="space-y-0.5">
+                {section.items.map((item) => {
+                  const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMobileOpen(false)}
+                      title={collapsed ? item.label : undefined}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition ${
+                        collapsed ? "justify-center" : ""
+                      } ${active ? "bg-blue-500 text-white shadow-sm shadow-blue-500/40" : "text-white/70 hover:bg-white/10 hover:text-white"}`}
+                    >
+                      <Icon className="h-5 w-5 shrink-0" />
+                      {!collapsed && <span className="truncate">{item.label}</span>}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
-        <div className="px-4 py-3 border-t border-white/10 text-xs text-white/50">
-          License: <span className={licenseStatus === "active" ? "text-green-400" : "text-red-400"}>{licenseStatus}</span>
-          {" · "}
-          {memberCount} member{memberCount === 1 ? "" : "s"}
-        </div>
+
+        <button
+          onClick={toggleCollapsed}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="hidden md:flex absolute -right-3 bottom-24 h-6 w-6 items-center justify-center rounded-full bg-blue-500 hover:bg-blue-400 text-white shadow-md ring-2 ring-[#111c42] transition z-50"
+        >
+          {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
+        </button>
+
+        {!collapsed && (
+          <div className="px-4 py-3 border-t border-white/10 text-xs text-white/50 shrink-0">
+            License: <span className={licenseStatus === "active" ? "text-green-400" : "text-red-400"}>{licenseStatus}</span>
+            {" · "}
+            {memberCount} member{memberCount === 1 ? "" : "s"}
+          </div>
+        )}
       </aside>
 
       {mobileOpen && <div className="fixed inset-0 bg-black/40 z-30 md:hidden" onClick={() => setMobileOpen(false)} />}
 
       {/* Main column */}
-      <div className="flex-1 flex flex-col md:pl-60 min-w-0">
+      <div className={`flex-1 flex flex-col min-w-0 transition-[padding] duration-200 ${mounted ? contentPad : "md:pl-60"}`}>
         <header className="sticky top-0 z-20 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
           <div className="flex items-center gap-3 px-4 h-16">
             <button onClick={() => setMobileOpen(true)} className="md:hidden text-zinc-500 hover:text-zinc-900 dark:hover:text-white">
