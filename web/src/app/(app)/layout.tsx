@@ -37,6 +37,32 @@ export default async function AppLayout({
     .eq("id", user.id)
     .single();
 
+  // License gate: JWT app_metadata carries the org; RLS lets a user read only
+  // their own organization row. No row (stale pre-tenant session) or a
+  // non-active license both block access.
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("name, license_status")
+    .maybeSingle();
+
+  if (!org || org.license_status !== "active") {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950 px-4">
+        <div className="w-full max-w-md rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-8 text-center">
+          <h1 className="text-xl font-bold mb-2">
+            {org ? "Subscription inactive" : "Session refresh needed"}
+          </h1>
+          <p className="text-sm text-zinc-500 mb-4">
+            {org
+              ? `The ${org.name} subscription is currently ${org.license_status}. Please contact your provider to restore access.`
+              : "Your account was updated. Please log out and sign in again to continue."}
+          </p>
+          <LogoutButton />
+        </div>
+      </main>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
       <header className="sticky top-0 z-10 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
