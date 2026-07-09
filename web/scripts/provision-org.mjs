@@ -7,6 +7,8 @@
 //   node scripts/provision-org.mjs suspend --slug nuts
 //   node scripts/provision-org.mjs resume  --slug nuts
 //   node scripts/provision-org.mjs list
+//   node scripts/provision-org.mjs add-membership --email owner@nuts.com --slug other-biz --role admin
+//   node scripts/provision-org.mjs list-memberships --email owner@nuts.com
 
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
@@ -78,6 +80,8 @@ async function create() {
     process.exit(1);
   }
 
+  await supabase.from("org_memberships").insert({ user_id: userData.user.id, organization_id: org.id, role: "admin" });
+
   console.log("✔ Organization provisioned");
   console.log("  Name:        " + org.name);
   console.log("  License key: " + org.license_key);
@@ -116,6 +120,67 @@ async function list() {
   console.table(data);
 }
 
+async function addMembership() {
+  const email = arg("email");
+  const slug = arg("slug");
+  const role = arg("role") ?? "cashier";
+  if (!email || !slug) {
+    console.error('Required: --email owner@x.com --slug business [--role admin|cashier|stock]');
+    process.exit(1);
+  }
+
+  const { data: org, error: orgErr } = await supabase.from("organizations").select("id, name").eq("slug", slug).single();
+  if (orgErr || !org) {
+    console.error("Organization not found:", slug);
+    process.exit(1);
+  }
+
+  const { data: users, error: userErr } = await supabase.auth.admin.listUsers();
+  if (userErr) {
+    console.error(userErr.message);
+    process.exit(1);
+  }
+  const user = users.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+  if (!user) {
+    console.error("No existing user with that email — use `create` for a brand new user.");
+    process.exit(1);
+  }
+
+  const { error } = await supabase.from("org_memberships").upsert(
+    { user_id: user.id, organization_id: org.id, role },
+    { onConflict: "user_id,organization_id" }
+  );
+  if (error) {
+    console.error("Failed to add membership:", error.message);
+    process.exit(1);
+  }
+
+  console.log(`✔ ${email} can now switch into "${org.name}" as ${role}`);
+}
+
+async function listMemberships() {
+  const email = arg("email");
+  if (!email) {
+    console.error("Required: --email owner@x.com");
+    process.exit(1);
+  }
+  const { data: users } = await supabase.auth.admin.listUsers();
+  const user = users.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+  if (!user) {
+    console.error("No user with that email.");
+    process.exit(1);
+  }
+  const { data, error } = await supabase
+    .from("org_memberships")
+    .select("role, organizations(name, slug, license_status)")
+    .eq("user_id", user.id);
+  if (error) {
+    console.error(error.message);
+    process.exit(1);
+  }
+  console.table(data.map((m) => ({ org: m.organizations.name, slug: m.organizations.slug, role: m.role, status: m.organizations.license_status })));
+}
+
 switch (command) {
   case "create":
     await create();
@@ -132,7 +197,13 @@ switch (command) {
   case "list":
     await list();
     break;
+  case "add-membership":
+    await addMembership();
+    break;
+  case "list-memberships":
+    await listMemberships();
+    break;
   default:
-    console.log("Commands: create | suspend | resume | cancel | list");
+    console.log("Commands: create | suspend | resume | cancel | list | add-membership | list-memberships");
     process.exit(1);
 }

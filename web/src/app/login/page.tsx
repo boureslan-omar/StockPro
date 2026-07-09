@@ -3,6 +3,7 @@
 import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { getMyMemberships } from "../(app)/org-actions";
 
 function LoginForm() {
   const router = useRouter();
@@ -29,8 +30,14 @@ function LoginForm() {
       return;
     }
 
-    router.push(searchParams.get("redirect") ?? "/");
-    router.refresh();
+    const redirectTo = searchParams.get("redirect") ?? "/";
+    const { memberships } = await getMyMemberships();
+    if (memberships.length > 1) {
+      router.push(`/select-organization?redirect=${encodeURIComponent(redirectTo)}`);
+    } else {
+      router.push(redirectTo);
+      router.refresh();
+    }
   }
 
   return (
