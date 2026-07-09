@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { fmtUSD } from "@/lib/format";
 import WastageForm from "./wastage-form";
+import ExpiryScanButton from "./expiry-scan-button";
 import { deleteWastage } from "./actions";
 
 const REASON_STYLE: Record<string, string> = {
@@ -40,6 +41,24 @@ export default async function WastagePage({
     .lte("wastage_date", now.toISOString().slice(0, 10));
   const mtdCost = (mtdRows ?? []).reduce((s, r) => s + Number(r.quantity) * Number(r.unit_cost), 0);
 
+  const soon = new Date(now);
+  soon.setDate(soon.getDate() + 7);
+  const { data: expiringBatches } = await supabase
+    .from("batches")
+    .select("id, quantity_remaining, expiry_date, cost_price, products(name, unit)")
+    .not("expiry_date", "is", null)
+    .lte("expiry_date", soon.toISOString().slice(0, 10))
+    .gt("quantity_remaining", 0)
+    .order("expiry_date", { ascending: true })
+    .limit(50);
+  const expiringRows = (expiringBatches ?? []) as unknown as {
+    id: number;
+    quantity_remaining: number;
+    expiry_date: string;
+    cost_price: number;
+    products: { name: string; unit: string | null } | null;
+  }[];
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -65,6 +84,58 @@ export default async function WastagePage({
           <p className="text-lg font-bold">{totalQty.toFixed(2)}</p>
         </div>
       </div>
+
+      {expiringRows.length > 0 && (
+        <div className="rounded-xl border border-red-200 dark:border-red-900 bg-white dark:bg-zinc-900 p-4 mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h3 className="font-semibold">Expiring &amp; Expired Batches</h3>
+              <p className="text-xs text-zinc-500">
+                A daily automated scan writes off already-expired batches as wastage. Batches expiring within 7 days are shown here as a heads-up.
+              </p>
+            </div>
+            <ExpiryScanButton />
+          </div>
+          <div className="overflow-x-auto rounded-lg border border-zinc-100 dark:border-zinc-800">
+            <table className="w-full text-sm">
+              <thead className="text-zinc-500 text-left bg-zinc-50 dark:bg-zinc-800/60">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Product</th>
+                  <th className="px-3 py-2 font-medium text-right">Qty Remaining</th>
+                  <th className="px-3 py-2 font-medium">Expiry Date</th>
+                  <th className="px-3 py-2 font-medium text-right">Value at Risk</th>
+                  <th className="px-3 py-2 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {expiringRows.map((b) => {
+                  const expired = b.expiry_date < now.toISOString().slice(0, 10);
+                  const value = Number(b.quantity_remaining) * Number(b.cost_price);
+                  return (
+                    <tr key={b.id} className="border-t border-zinc-100 dark:border-zinc-800">
+                      <td className="px-3 py-1.5">{b.products?.name ?? "—"}</td>
+                      <td className="px-3 py-1.5 text-right">
+                        {Number(b.quantity_remaining)} {b.products?.unit ?? ""}
+                      </td>
+                      <td className="px-3 py-1.5">{b.expiry_date}</td>
+                      <td className="px-3 py-1.5 text-right text-red-600 font-medium">{fmtUSD(value)}</td>
+                      <td className="px-3 py-1.5">
+                        {expired ? (
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300">Expired</span>
+                        ) : (
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">
+                            Expiring soon
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <form method="GET" className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 mb-4 flex flex-wrap gap-3 items-end">
         <div>

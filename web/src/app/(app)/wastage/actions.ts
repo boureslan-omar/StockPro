@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { deductStockFifo } from "@/lib/stock";
+import { runExpiryScan } from "@/lib/expiry-scan";
 
 const REASONS = ["expired", "damaged", "owner_use", "sample", "lost", "other"];
 
@@ -87,4 +88,15 @@ export async function deleteWastage(id: number) {
 
   await supabase.from("wastage").delete().eq("id", id);
   revalidatePath("/wastage");
+}
+
+export async function runExpiryScanNow() {
+  const supabase = await createClient();
+  const result = await runExpiryScan(supabase);
+  revalidatePath("/wastage");
+  revalidatePath("/products");
+  if (result.count === 0) return { message: "No expired batches found — nothing to write off." };
+  return {
+    message: `Wrote off ${result.count} expired batch${result.count === 1 ? "" : "es"} (${result.totalQty.toFixed(2)} units, $${result.totalCost.toFixed(2)} loss) as wastage.`,
+  };
 }
