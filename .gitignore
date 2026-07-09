@@ -1,0 +1,10 @@
+# Machine-locked license file (per-machine, never commit)
+license.lic
+
+# Logs
+*.log
+
+# Local/session junk
+Thumbs.db
+desktop.ini
+.claude/

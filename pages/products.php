@@ -1,0 +1,1063 @@
+﻿<?php
+require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../includes/layout.php';
+requireRole('admin','stock');
+
+$message = '';
+
+if (isset($_GET['delete'])) {
+    $did = (int)$_GET['delete'];
+    $inSales = $pdo->prepare("SELECT COUNT(*) FROM sale_items WHERE product_id=?");
+    $inSales->execute([$did]);
+    $inPurch = $pdo->prepare("SELECT COUNT(*) FROM purchase_items WHERE product_id=?");
+    $inPurch->execute([$did]);
+    if ($inSales->fetchColumn() > 0 || $inPurch->fetchColumn() > 0) {
+        $message = 'error:Cannot delete — this product has sales or purchase history. Deactivate it instead by setting stock to 0.';
+    } else {
+        $pdo->prepare("DELETE FROM products WHERE id=?")->execute([$did]);
+        header('Location: products.php'); exit;
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $id          = (int)($_POST['id'] ?? 0);
+    $barcode     = trim($_POST['barcode'] ?? '');
+    $name        = trim($_POST['name'] ?? '');
+    $cat         = (int)($_POST['category_id'] ?? 0) ?: null;
+    $sup         = (int)($_POST['supplier_id'] ?? 0) ?: null;
+    $type        = in_array($_POST['product_type'] ?? '', ['regular','bulk']) ? $_POST['product_type'] : 'regular';
+    $cost        = (float)($_POST['cost_price'] ?? 0);
+    $sell        = (float)($_POST['sell_price'] ?? 0);
+    $stock       = (float)($_POST['stock'] ?? 0);
+    $alert       = (float)($_POST['low_stock_alert'] ?? 5);
+    $unit        = trim($_POST['unit'] ?? 'pcs');
+    $upb         = max(1, (int)($_POST['units_per_box'] ?? 1));
+    $boxPrice    = (float)($_POST['sell_price_box'] ?? 0) ?: null;
+    $source      = ($_POST['product_source'] ?? '') === 'consignment' ? 'consignment' : 'owned';
+    $consSup     = (int)($_POST['consignment_supplier_id'] ?? 0) ?: null;
+    $consCost    = (float)($_POST['consignment_cost'] ?? 0);
+    $trackExpiry = ($type === 'regular') ? (int)(isset($_POST['track_expiry']) && $_POST['track_expiry'] == '1') : 0;
+
+    if ($source === 'consignment') {
+        $consCost = $consCost ?: $cost;
+        $cost = $consCost;
+    }
+
+    if (!$name) {
+        $message = 'error:Product name is required.';
+    } else {
+        if (empty($barcode)) {
+            $barcode = generateEAN13($pdo);
+        }
+        if ($id) {
+            $pdo->prepare("UPDATE products SET barcode=?,name=?,category_id=?,supplier_id=?,product_type=?,cost_price=?,sell_price=?,stock=?,low_stock_alert=?,unit=?,units_per_box=?,sell_price_box=?,product_source=?,consignment_supplier_id=?,consignment_cost=?,track_expiry=? WHERE id=?")
+                ->execute([$barcode,$name,$cat,$sup,$type,$cost,$sell,$stock,$alert,$unit,$upb,$boxPrice,$source,$consSup,$consCost,$trackExpiry,$id]);
+        } else {
+            $pdo->prepare("INSERT INTO products (barcode,name,category_id,supplier_id,product_type,cost_price,sell_price,stock,low_stock_alert,unit,units_per_box,sell_price_box,product_source,consignment_supplier_id,consignment_cost,track_expiry) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+                ->execute([$barcode,$name,$cat,$sup,$type,$cost,$sell,$stock,$alert,$unit,$upb,$boxPrice,$source,$consSup,$consCost,$trackExpiry]);
+        }
+        $message = 'success:Product saved.';
+    }
+}
+
+$search    = trim($_GET['q'] ?? '');
+$catFilter = (int)($_GET['cat'] ?? 0);
+$typeFilter = $_GET['type'] ?? '';
+$whereSQL  = [];
+$params    = [];
+if ($search)    { $whereSQL[] = "(p.name LIKE ? OR p.barcode LIKE ?)"; $params[] = "%$search%"; $params[] = "%$search%"; }
+if ($catFilter) { $whereSQL[] = "p.category_id = ?"; $params[] = $catFilter; }
+if (in_array($typeFilter,['regular','bulk'])) { $whereSQL[] = "p.product_type = ?"; $params[] = $typeFilter; }
+$where = $whereSQL ? 'WHERE ' . implode(' AND ', $whereSQL) : '';
+
+$stmt = $pdo->prepare("SELECT p.*, c.name AS cat_name, s.name AS sup_name FROM products p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN suppliers s ON s.id=p.supplier_id $where ORDER BY p.product_type, p.name");
+$stmt->execute($params);
+$products   = $stmt->fetchAll();
+$categories = $pdo->query("SELECT * FROM categories ORDER BY name")->fetchAll();
+$suppliers  = $pdo->query("SELECT * FROM suppliers ORDER BY name")->fetchAll();
+$lowStockModal = $pdo->query("
+    SELECT p.id, p.name, s.name AS sup_name, p.stock, p.low_stock_alert,
+           p.unit, p.cost_price, p.units_per_box
+    FROM products p
+    LEFT JOIN suppliers s ON s.id = p.supplier_id
+    WHERE p.product_type != 'bulk' AND p.stock <= p.low_stock_alert
+    ORDER BY p.stock ASC, p.name
+")->fetchAll();
+
+// ── Expiry monitor data ───────────────────────────────────────────────────────
+$expiryRows = [];
+try {
+    $expiryRows = $pdo->query("
+        SELECT b.id AS batch_id, b.expiry_date, b.quantity_remaining, b.cost_price,
+               p.id AS product_id, p.name AS product_name, p.unit
+        FROM batches b
+        JOIN products p ON p.id = b.product_id
+        WHERE b.expiry_date IS NOT NULL
+          AND b.quantity_remaining > 0
+        ORDER BY b.expiry_date ASC
+        LIMIT 200
+    ")->fetchAll();
+} catch (Exception $e) { /* column not added yet */ }
+
+renderHead('Products');
+renderNav('products');
+alertBox($message);
+?>
+<div class="container-fluid py-4">
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold"><i class="bi bi-box-seam me-2"></i>Products</h4>
+    <div class="d-flex gap-2">
+        <a href="import_products.php?export=1" class="btn btn-outline-success btn-sm">
+            <i class="bi bi-download"></i> Export CSV
+        </a>
+        <a href="import_products.php" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-upload"></i> Import XLSX/CSV
+        </a>
+        <button id="print-barcodes-btn" class="btn btn-outline-secondary d-none" onclick="printSelectedBarcodes()">
+            <i class="bi bi-upc-scan"></i> Print Barcodes <span id="sel-count" class="badge bg-secondary ms-1">0</span>
+        </button>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#productModal" onclick="clearForm()">
+            <i class="bi bi-plus-lg"></i> Add Product
+        </button>
+    </div>
+</div>
+
+<!-- Filters -->
+<form class="row g-2 mb-3" method="GET">
+    <div class="col-md-3"><input type="text" name="q" class="form-control" placeholder="Search name / barcode" value="<?= htmlspecialchars($search) ?>"></div>
+    <div class="col-md-2">
+        <select name="cat" class="form-select">
+            <option value="">All Categories</option>
+            <?php foreach ($categories as $c): ?>
+            <option value="<?= $c['id'] ?>" <?= $catFilter==$c['id']?'selected':'' ?>><?= htmlspecialchars($c['name']) ?></option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+    <div class="col-md-2">
+        <select name="type" class="form-select">
+            <option value="">All Types</option>
+            <option value="regular" <?= $typeFilter==='regular'?'selected':'' ?>>Regular (tracked)</option>
+            <option value="bulk" <?= $typeFilter==='bulk'?'selected':'' ?>>Bulk (veg/fruits)</option>
+        </select>
+    </div>
+    <div class="col-auto"><button class="btn btn-outline-primary"><i class="bi bi-funnel"></i> Filter</button></div>
+    <div class="col-auto"><a href="products.php" class="btn btn-outline-secondary">Reset</a></div>
+</form>
+
+<div class="card stat-card">
+<div class="table-responsive">
+<table class="table table-hover align-middle mb-0">
+    <thead class="table-dark"><tr>
+        <th><input type="checkbox" id="chk-all" onchange="toggleAll(this)"></th>
+        <th>Type</th><th>Barcode</th><th>Name</th><th>Category</th>
+        <th>Cost</th><th>Sell Price</th><th>Margin%</th><th>Stock / Batches</th><th>Unit</th><th>Actions</th>
+    </tr></thead>
+    <tbody>
+    <?php foreach ($products as $p):
+        $margin = $p['sell_price'] > 0 ? round((($p['sell_price']-$p['cost_price'])/$p['sell_price'])*100,1) : 0;
+        $isBulk = $p['product_type'] === 'bulk';
+    ?>
+    <tr class="<?= $isBulk ? 'table-warning bg-opacity-25' : '' ?>">
+        <td><input type="checkbox" class="prod-chk" value="<?= $p['id'] ?>" data-barcode="<?= htmlspecialchars($p['barcode'] ?? '') ?>" onchange="updateSelection()"></td>
+        <td>
+            <?php if ($p['product_source'] === 'consignment'): ?>
+            <span class="badge bg-purple text-white" style="background:#7c3aed!important">Consignment</span>
+            <?php elseif ($isBulk): ?>
+            <span class="badge bg-warning text-dark">Bulk</span>
+            <?php else: ?>
+            <span class="badge bg-info text-dark">Regular</span>
+            <?php endif; ?>
+        </td>
+        <td class="text-muted small"><?= htmlspecialchars($p['barcode'] ?: '—') ?></td>
+        <td class="fw-semibold"><?= htmlspecialchars($p['name']) ?></td>
+        <td><?= htmlspecialchars($p['cat_name'] ?? '—') ?></td>
+        <td><?= fmtUSD($p['cost_price']) ?></td>
+        <td><?= fmtUSD($p['sell_price']) ?></td>
+        <td><span class="badge <?= $margin>20?'bg-success':($margin>10?'bg-warning text-dark':'bg-danger') ?>"><?= $margin ?>%</span></td>
+        <td>
+            <?php if ($isBulk): ?>
+                <span class="text-muted">—</span>
+            <?php else: ?>
+                <span class="<?= $p['stock']==0?'stock-out fw-bold':($p['stock']<=$p['low_stock_alert']?'stock-low':'stock-ok') ?>"><?= (float)$p['stock'] ?></span>
+                <button class="btn btn-link btn-sm p-0 ms-1 text-muted" title="View batches" onclick="viewBatches(<?= $p['id'] ?>, <?= htmlspecialchars(json_encode($p['name'])) ?>)">
+                    <i class="bi bi-layers"></i>
+                </button>
+            <?php endif; ?>
+        </td>
+        <td><?= htmlspecialchars($p['unit']) ?></td>
+        <td>
+            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#productModal" onclick="fillForm(<?= htmlspecialchars(json_encode($p)) ?>)"><i class="bi bi-pencil"></i></button>
+            <a href="?delete=<?= $p['id'] ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this product?')"><i class="bi bi-trash"></i></a>
+        </td>
+    </tr>
+    <?php endforeach; ?>
+    <?php if (!$products): ?><tr><td colspan="11" class="text-center text-muted py-4">No products found.</td></tr><?php endif; ?>
+    </tbody>
+</table>
+</div>
+</div>
+</div>
+
+<!-- Expiry Monitor -->
+<?php
+$today   = date('Y-m-d');
+$soon    = date('Y-m-d', strtotime('+30 days'));
+$expired = array_filter($expiryRows, fn($r) => $r['expiry_date'] <= $today);
+$expSoon = array_filter($expiryRows, fn($r) => $r['expiry_date'] > $today && $r['expiry_date'] <= $soon);
+if ($expiryRows):
+?>
+<div class="mt-4">
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <h6 class="fw-bold mb-0"><i class="bi bi-calendar-x text-danger me-2"></i>Expiry Monitor</h6>
+    <span class="small text-muted">Products with expiry tracking enabled</span>
+</div>
+<?php if ($expired): ?>
+<div class="alert alert-danger py-2 px-3 mb-2">
+    <strong><i class="bi bi-exclamation-triangle me-1"></i><?= count($expired) ?> batch(es) EXPIRED</strong> — action required
+</div>
+<?php endif; ?>
+<?php if ($expSoon): ?>
+<div class="alert alert-warning py-2 px-3 mb-2">
+    <strong><i class="bi bi-clock-history me-1"></i><?= count($expSoon) ?> batch(es) expiring within 30 days</strong>
+</div>
+<?php endif; ?>
+<div class="card stat-card">
+<div class="table-responsive">
+<table class="table table-sm align-middle mb-0">
+    <thead class="table-dark"><tr>
+        <th>Product</th><th>Expiry Date</th><th>Days Left</th><th>Qty Remaining</th><th>Value at Cost</th><th>Action</th>
+    </tr></thead>
+    <tbody>
+    <?php foreach ($expiryRows as $r):
+        $daysLeft = (int)((strtotime($r['expiry_date']) - strtotime($today)) / 86400);
+        $rowClass = $daysLeft <= 0 ? 'table-danger' : ($daysLeft <= 30 ? 'table-warning' : '');
+        $badge    = $daysLeft <= 0 ? '<span class="badge bg-danger">EXPIRED</span>'
+                  : ($daysLeft <= 7  ? "<span class=\"badge bg-danger\">{$daysLeft}d left</span>"
+                  : ($daysLeft <= 30 ? "<span class=\"badge bg-warning text-dark\">{$daysLeft}d left</span>"
+                  :                    "<span class=\"badge bg-success\">{$daysLeft}d left</span>"));
+    ?>
+    <tr class="<?= $rowClass ?>">
+        <td class="fw-semibold"><?= htmlspecialchars($r['product_name']) ?></td>
+        <td><?= date('d/m/Y', strtotime($r['expiry_date'])) ?></td>
+        <td><?= $badge ?></td>
+        <td><?= (float)$r['quantity_remaining'] ?> <?= htmlspecialchars($r['unit']) ?></td>
+        <td><?= fmtUSD($r['quantity_remaining'] * $r['cost_price']) ?></td>
+        <td>
+            <a href="/stockpro/pages/wastage.php" class="btn btn-sm btn-outline-danger" title="Record as wastage">
+                <i class="bi bi-trash3"></i> Wastage
+            </a>
+        </td>
+    </tr>
+    <?php endforeach; ?>
+    </tbody>
+</table>
+</div>
+</div>
+</div>
+<?php endif; ?>
+
+<!-- Product Modal -->
+<div class="modal fade" id="productModal" tabindex="-1">
+<div class="modal-dialog modal-lg">
+<div class="modal-content">
+<form method="POST">
+<input type="hidden" name="id" id="f_id">
+<div class="modal-header"><h5 class="modal-title">Product</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal-body">
+
+    <!-- Source selector -->
+    <div class="mb-3">
+        <label class="form-label fw-bold">Product Source</label>
+        <div class="d-flex gap-4">
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="product_source" id="srcOwned" value="owned" checked onchange="toggleSource()">
+                <label class="form-check-label" for="srcOwned"><strong>Owned</strong> — purchased by the market</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="product_source" id="srcConsignment" value="consignment" onchange="toggleSource()">
+                <label class="form-check-label" for="srcConsignment"><strong>Consignment</strong> — supplier-owned, sold on behalf</label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Consignment fields (shown only when source=consignment) -->
+    <div id="consignment-fields" class="alert alert-info py-2 px-3 mb-3 d-none">
+        <div class="row g-2">
+            <div class="col-md-6">
+                <label class="form-label small fw-bold mb-1">Consignment Supplier *</label>
+                <select name="consignment_supplier_id" id="f_cons_sup" class="form-select form-select-sm">
+                    <option value="">— Select Supplier —</option>
+                    <?php foreach ($suppliers as $s): ?>
+                    <option value="<?= $s['id'] ?>"><?= htmlspecialchars($s['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small fw-bold mb-1">Supplier Cost / Unit *</label>
+                <div class="input-group input-group-sm">
+                    <input type="number" name="consignment_cost" id="f_cons_cost" class="form-control" step="0.0001" min="0" placeholder="What supplier charges per unit" data-cur="usd" oninput="prodUpdateHint('f_cons_cost')">
+                    <button type="button" id="f_cons_cost_usd" class="btn btn-outline-secondary px-1" style="font-size:.65rem;font-weight:bold" onclick="prodToggleCur('f_cons_cost','usd')">USD</button>
+                    <button type="button" id="f_cons_cost_lbp" class="btn btn-outline-secondary px-1 opacity-50" style="font-size:.65rem" onclick="prodToggleCur('f_cons_cost','lbp')">LBP</button>
+                </div>
+                <div id="f_cons_cost_hint" class="form-text text-muted"></div>
+                <div class="form-text">This amount goes to the supplier when sold.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Type selector -->
+    <div class="mb-3">
+        <label class="form-label fw-bold">Product Type</label>
+        <div class="d-flex gap-3">
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="product_type" id="typeRegular" value="regular" checked onchange="toggleType()">
+                <label class="form-check-label" for="typeRegular"><strong>Regular</strong> — tracked stock, batch pricing</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="product_type" id="typeBulk" value="bulk" onchange="toggleType()">
+                <label class="form-check-label" for="typeBulk"><strong>Bulk</strong> — vegetables, fruits (no stock count)</label>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-6"><label class="form-label">Name *</label><input type="text" name="name" id="f_name" class="form-control" required></div>
+        <div class="col-md-6">
+            <label class="form-label">Barcode</label>
+            <div class="input-group">
+                <input type="text" name="barcode" id="f_barcode" class="form-control" placeholder="Scan or type">
+                <button type="button" class="btn btn-outline-secondary" onclick="generateBarcode()" title="Auto-generate EAN-13 barcode">
+                    <i class="bi bi-upc-scan"></i> Generate
+                </button>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Category</label>
+            <div class="input-group">
+                <select name="category_id" id="f_cat" class="form-select">
+                    <option value="">— None —</option>
+                    <?php foreach ($categories as $c): ?><option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['name']) ?></option><?php endforeach; ?>
+                </select>
+                <button type="button" class="btn btn-outline-secondary" onclick="openNewCatModal('f_cat')" title="New category"><i class="bi bi-plus-lg"></i></button>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Supplier</label>
+            <select name="supplier_id" id="f_sup" class="form-select">
+                <option value="">— None —</option>
+                <?php foreach ($suppliers as $s): ?><option value="<?= $s['id'] ?>"><?= htmlspecialchars($s['name']) ?></option><?php endforeach; ?>
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Unit</label>
+            <select name="unit" id="f_unit" class="form-select" onchange="onUnitChange()">
+                <option value="pcs">pcs — pieces</option>
+                <option value="box">box</option>
+                <option value="kg">kg — kilograms</option>
+                <option value="g">g — grams</option>
+                <option value="L">L — litres</option>
+                <option value="mL">mL — millilitres</option>
+            </select>
+        </div>
+        <!-- Regular unit pricing (hidden when unit=box) -->
+        <div class="col-md-4" id="row-cost">
+            <label class="form-label">Cost Price</label>
+            <div class="input-group">
+                <input type="number" name="cost_price" id="f_cost" class="form-control" step="0.0001" min="0" data-cur="usd" oninput="calcMargin(); prodUpdateHint('f_cost')">
+                <button type="button" id="f_cost_usd" class="btn btn-outline-secondary btn-sm px-1" style="font-size:.7rem;min-width:36px;font-weight:bold" onclick="prodToggleCur('f_cost','usd')" title="USD">USD</button>
+                <button type="button" id="f_cost_lbp" class="btn btn-outline-secondary btn-sm px-1 opacity-50" style="font-size:.7rem;min-width:36px" onclick="prodToggleCur('f_cost','lbp')" title="LBP">LBP</button>
+            </div>
+            <div id="f_cost_hint" class="form-text text-muted"></div>
+        </div>
+        <div class="col-md-4" id="row-sell">
+            <label class="form-label d-flex justify-content-between align-items-center flex-wrap gap-1">
+                <span id="sell-label">Sell Price / Unit</span>
+                <span class="form-check form-check-inline mb-0">
+                    <input class="form-check-input" type="checkbox" id="use-margin" onchange="toggleMarginMode()">
+                    <label class="form-check-label small text-muted fw-normal" for="use-margin">Set by margin %</label>
+                </span>
+            </label>
+            <div class="input-group">
+                <input type="number" name="sell_price" id="f_sell" class="form-control" step="0.0001" min="0" data-cur="usd" oninput="calcMargin(); prodUpdateHint('f_sell')">
+                <button type="button" id="f_sell_usd" class="btn btn-outline-secondary btn-sm px-1" style="font-size:.7rem;min-width:36px;font-weight:bold" onclick="prodToggleCur('f_sell','usd')" title="USD">USD</button>
+                <button type="button" id="f_sell_lbp" class="btn btn-outline-secondary btn-sm px-1 opacity-50" style="font-size:.7rem;min-width:36px" onclick="prodToggleCur('f_sell','lbp')" title="LBP">LBP</button>
+            </div>
+            <div id="f_sell_hint" class="form-text text-muted"></div>
+            <div id="sell-calc-preview" class="form-text text-muted" style="display:none"></div>
+        </div>
+        <div class="col-md-4" id="row-margin">
+            <label class="form-label">Margin %</label>
+            <div class="form-control-plaintext fw-bold" id="margin-preview">—</div>
+            <div id="margin-input-wrap" style="display:none">
+                <div class="input-group input-group-sm">
+                    <input type="number" id="f_margin_pct" class="form-control" step="0.1" min="0" max="99.9" placeholder="e.g. 25" oninput="calcSellFromMargin()">
+                    <span class="input-group-text">%</span>
+                </div>
+                <div id="margin-sell-preview" class="form-text"></div>
+            </div>
+        </div>
+        <div class="col-md-4 regular-only"><label class="form-label">Stock</label><input type="number" name="stock" id="f_stock" class="form-control" min="0" step="0.001" value="0"></div>
+        <div class="col-md-4 regular-only"><label class="form-label">Low Stock Alert</label><input type="number" name="low_stock_alert" id="f_alert" class="form-control" min="0" step="0.001" value="5"></div>
+        <div class="col-md-4 regular-only">
+            <label class="form-label">Expiry Tracking</label>
+            <div class="form-check form-switch mt-1">
+                <input class="form-check-input" type="checkbox" name="track_expiry" id="f_track_expiry" value="1" role="switch">
+                <label class="form-check-label" for="f_track_expiry">Track expiry dates for batches</label>
+            </div>
+            <div class="form-text text-muted">When on, expiry date is required when receiving stock.</div>
+        </div>
+        <!-- Box fields (shown only when unit=box) -->
+        <div class="col-12" id="row-box-header" style="display:none"><hr class="my-1"><label class="form-label fw-semibold small text-muted">📦 Box Details</label></div>
+        <div class="col-md-4" id="row-upb" style="display:none">
+            <label class="form-label">Units per Box</label>
+            <input type="number" name="units_per_box" id="f_upb" class="form-control" min="1" step="1" value="1" oninput="calcFromBox()">
+        </div>
+        <div class="col-md-4" id="row-cost-box" style="display:none">
+            <label class="form-label">Cost per Box (USD)</label>
+            <div class="input-group">
+                <span class="input-group-text">$</span>
+                <input type="number" id="f_cost_box" class="form-control" step="0.0001" min="0" placeholder="What you pay per box" oninput="calcFromBox()">
+            </div>
+        </div>
+        <div class="col-md-4" id="row-sell-box" style="display:none">
+            <label class="form-label d-flex justify-content-between align-items-center flex-wrap gap-1">
+                <span>Sell Price per Box</span>
+                <span class="form-check form-check-inline mb-0">
+                    <input class="form-check-input" type="checkbox" id="use-margin-box" onchange="toggleBoxMarginMode()">
+                    <label class="form-check-label small text-muted fw-normal" for="use-margin-box">Set by margin %</label>
+                </span>
+            </label>
+            <div class="input-group">
+                <input type="number" name="sell_price_box" id="f_sell_box" class="form-control" step="0.0001" min="0" data-cur="usd" oninput="calcFromBox(); prodUpdateHint('f_sell_box')">
+                <button type="button" id="f_sell_box_usd" class="btn btn-outline-secondary btn-sm px-1" style="font-size:.7rem;min-width:36px;font-weight:bold" onclick="prodToggleCur('f_sell_box','usd')" title="USD">USD</button>
+                <button type="button" id="f_sell_box_lbp" class="btn btn-outline-secondary btn-sm px-1 opacity-50" style="font-size:.7rem;min-width:36px" onclick="prodToggleCur('f_sell_box','lbp')" title="LBP">LBP</button>
+            </div>
+            <div id="f_sell_box_hint" class="form-text text-muted"></div>
+        </div>
+        <div class="col-md-4" id="row-box-margin" style="display:none">
+            <label class="form-label">Box Margin %</label>
+            <div class="form-control-plaintext fw-bold text-muted" id="box-margin-preview">—</div>
+            <div id="box-margin-input-wrap" style="display:none">
+                <div class="input-group input-group-sm">
+                    <input type="number" id="f_box_margin_pct" class="form-control" step="0.1" min="0" max="99.9" placeholder="e.g. 25" oninput="calcBoxSellFromMargin()">
+                    <span class="input-group-text">%</span>
+                </div>
+                <div id="box-margin-sell-preview" class="form-text"></div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal-footer">
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+    <button type="submit" class="btn btn-primary">Save Product</button>
+</div>
+</form>
+</div></div></div>
+
+<script>
+function toggleSource() {
+    const isCons = document.getElementById('srcConsignment').checked;
+    document.getElementById('consignment-fields').classList.toggle('d-none', !isCons);
+    document.getElementById('f_cons_cost').required = isCons;
+    document.getElementById('f_cons_sup').required  = isCons;
+}
+
+function toggleType() {
+    const isBulk = document.getElementById('typeBulk').checked;
+    document.querySelectorAll('.regular-only').forEach(el => el.style.display = isBulk ? 'none' : '');
+    onUnitChange();
+}
+
+function onUnitChange() {
+    const isBulk = document.getElementById('typeBulk').checked;
+    const isBox  = document.getElementById('f_unit').value === 'box';
+    const showBox  = !isBulk && isBox;
+    const showUnit = !isBulk && !isBox;
+
+    document.getElementById('row-cost').style.display       = showUnit ? '' : 'none';
+    document.getElementById('row-sell').style.display       = showUnit ? '' : 'none';
+    document.getElementById('row-margin').style.display     = showUnit ? '' : 'none';
+    document.getElementById('row-box-header').style.display = showBox  ? '' : 'none';
+    document.getElementById('row-upb').style.display        = showBox  ? '' : 'none';
+    document.getElementById('row-cost-box').style.display   = showBox  ? '' : 'none';
+    document.getElementById('row-sell-box').style.display   = showBox  ? '' : 'none';
+    document.getElementById('row-box-margin').style.display = showBox  ? '' : 'none';
+
+    if (showBox) calcFromBox();
+}
+
+function sellBoxUSD() {
+    const inp = document.getElementById('f_sell_box');
+    const raw = parseFloat(inp?.value || 0);
+    return (inp?.dataset.cur === 'lbp') ? raw / PROD_RATE : raw;
+}
+
+function calcFromBox() {
+    const upb     = Math.max(1, parseInt(document.getElementById('f_upb').value || 1));
+    const costBox = parseFloat(document.getElementById('f_cost_box').value || 0);
+    const sellBox = sellBoxUSD();
+    if (costBox > 0) document.getElementById('f_cost').value = (costBox / upb).toFixed(4);
+    if (!document.getElementById('use-margin-box')?.checked && sellBox > 0)
+        document.getElementById('f_sell').value = (sellBox / upb).toFixed(4);
+    if (document.getElementById('use-margin-box')?.checked) {
+        calcBoxSellFromMargin();
+    } else {
+        calcBoxPrice();
+    }
+    if (document.getElementById('use-margin')?.checked) calcSellFromMargin();
+    else calcMargin();
+}
+
+function calcBoxPrice() {
+    const upb      = parseInt(document.getElementById('f_upb')?.value || 1);
+    const boxPrice = sellBoxUSD();
+    const cost     = parseFloat(document.getElementById('f_cost')?.value || 0);
+    const el       = document.getElementById('box-margin-preview');
+    if (!el) return;
+    if (!boxPrice || upb < 1) { el.textContent = '—'; el.className = 'form-control-plaintext fw-bold text-muted'; return; }
+    const boxCost = cost * upb;
+    const margin  = boxPrice > 0 ? (((boxPrice - boxCost) / boxPrice) * 100).toFixed(1) : '—';
+    el.textContent = margin + '%  — $' + cost.toFixed(4) + '/unit';
+    el.className = 'form-control-plaintext fw-bold ' + (boxPrice > boxCost ? 'text-success' : 'text-danger');
+}
+
+function clearForm() {
+    document.getElementById('f_id').value = '';
+    document.getElementById('f_name').value = '';
+    document.getElementById('f_barcode').value = '';
+    document.getElementById('f_cost').value = '';
+    document.getElementById('f_sell').value = '';
+    document.getElementById('f_stock').value = '0';
+    document.getElementById('f_alert').value = '5';
+    document.getElementById('f_unit').value = 'pcs';
+    document.getElementById('f_upb').value = '1';
+    document.getElementById('f_sell_box').value = '';
+    document.getElementById('f_cost_box').value = '';
+    document.getElementById('f_cat').value = '';
+    document.getElementById('f_sup').value = '';
+    document.getElementById('f_cons_sup').value = '';
+    document.getElementById('f_cons_cost').value = '';
+    document.getElementById('typeRegular').checked = true;
+    document.getElementById('srcOwned').checked = true;
+    document.getElementById('f_track_expiry').checked = false;
+    document.getElementById('margin-preview').textContent = '—';
+    document.getElementById('box-margin-preview').textContent = '—';
+    resetMarginModes();
+    prodResetCur('f_cost');
+    prodResetCur('f_sell');
+    prodResetCur('f_cons_cost');
+    prodResetCur('f_sell_box');
+    toggleType();
+    toggleSource();
+}
+
+function fillForm(p) {
+    document.getElementById('f_id').value      = p.id;
+    document.getElementById('f_name').value    = p.name;
+    document.getElementById('f_barcode').value = p.barcode || '';
+    document.getElementById('f_cat').value     = p.category_id || '';
+    document.getElementById('f_sup').value     = p.supplier_id || '';
+    document.getElementById('f_unit').value    = p.unit || 'pcs';
+    document.getElementById('f_cost').value    = p.cost_price;
+    document.getElementById('f_sell').value    = p.sell_price;
+    document.getElementById('f_stock').value   = p.stock;
+    document.getElementById('f_alert').value   = p.low_stock_alert;
+    document.getElementById(p.product_type === 'bulk' ? 'typeBulk' : 'typeRegular').checked = true;
+    document.getElementById(p.product_source === 'consignment' ? 'srcConsignment' : 'srcOwned').checked = true;
+    document.getElementById('f_track_expiry').checked = !!parseInt(p.track_expiry || 0);
+    document.getElementById('f_cons_sup').value  = p.consignment_supplier_id || '';
+    document.getElementById('f_cons_cost').value = p.consignment_cost || '';
+    document.getElementById('f_upb').value       = p.units_per_box || 1;
+    document.getElementById('f_sell_box').value  = p.sell_price_box || '';
+    const upb = parseInt(p.units_per_box || 1);
+    document.getElementById('f_cost_box').value  = (p.unit === 'box' && parseFloat(p.cost_price) > 0)
+        ? (parseFloat(p.cost_price) * upb).toFixed(4) : '';
+    resetMarginModes();
+    prodResetCur('f_cost');
+    prodResetCur('f_sell');
+    prodResetCur('f_cons_cost');
+    prodResetCur('f_sell_box');
+    calcMargin();
+    calcBoxPrice();
+    toggleType();
+    toggleSource();
+}
+
+function calcMargin() {
+    if (document.getElementById('use-margin')?.checked) { calcSellFromMargin(); return; }
+    const cost = parseFloat(document.getElementById('f_cost')?.value || 0);
+    const sell = parseFloat(document.getElementById('f_sell')?.value || 0);
+    const el = document.getElementById('margin-preview');
+    el.textContent = sell > 0 ? (((sell - cost) / sell) * 100).toFixed(1) + '%' : '—';
+    el.className = 'form-control-plaintext fw-bold ' + (sell > cost ? 'text-success' : 'text-danger');
+}
+
+// ── Margin-mode helpers ───────────────────────────────────────────────────────
+
+function resetMarginModes() {
+    document.getElementById('use-margin').checked     = false;
+    document.getElementById('use-margin-box').checked = false;
+    document.getElementById('f_sell').readOnly        = false;
+    document.getElementById('f_sell').style.background = '';
+    document.getElementById('f_sell_box').readOnly    = false;
+    document.getElementById('f_sell_box').style.background = '';
+    document.getElementById('margin-preview').style.display      = '';
+    document.getElementById('margin-input-wrap').style.display   = 'none';
+    document.getElementById('box-margin-preview').style.display  = '';
+    document.getElementById('box-margin-input-wrap').style.display = 'none';
+    document.getElementById('f_margin_pct').value       = '';
+    document.getElementById('f_box_margin_pct').value   = '';
+    document.getElementById('margin-sell-preview').textContent     = '';
+    document.getElementById('box-margin-sell-preview').textContent = '';
+}
+
+function toggleMarginMode() {
+    const on = document.getElementById('use-margin').checked;
+    document.getElementById('f_sell').readOnly        = on;
+    document.getElementById('f_sell').style.background = on ? '#f8f9fa' : '';
+    document.getElementById('margin-preview').style.display    = on ? 'none' : '';
+    document.getElementById('margin-input-wrap').style.display = on ? ''     : 'none';
+    if (on) {
+        // pre-fill margin from current sell price if possible
+        const cost = parseFloat(document.getElementById('f_cost').value || 0);
+        const sell = parseFloat(document.getElementById('f_sell').value || 0);
+        if (sell > 0 && cost >= 0) {
+            document.getElementById('f_margin_pct').value = ((sell - cost) / sell * 100).toFixed(1);
+        }
+        calcSellFromMargin();
+    } else {
+        document.getElementById('f_sell').value = '';
+        document.getElementById('margin-sell-preview').textContent = '';
+        calcMargin();
+    }
+}
+
+function calcSellFromMargin() {
+    const cost    = parseFloat(document.getElementById('f_cost').value || 0);
+    const pct     = parseFloat(document.getElementById('f_margin_pct').value);
+    const preview = document.getElementById('margin-sell-preview');
+    if (isNaN(pct) || pct === 0) {
+        preview.textContent = ''; document.getElementById('f_sell').value = ''; return;
+    }
+    if (pct >= 100) {
+        preview.textContent = 'Invalid — must be less than 100%';
+        preview.className   = 'form-text text-danger fw-bold';
+        document.getElementById('f_sell').value = ''; return;
+    }
+    if (cost <= 0) {
+        preview.textContent = 'Enter cost price first';
+        preview.className   = 'form-text text-muted'; return;
+    }
+    const sell = cost / (1 - pct / 100);
+    document.getElementById('f_sell').value = sell.toFixed(4);
+    preview.textContent = '→ Sell price: $' + sell.toFixed(2);
+    preview.className   = 'form-text text-success fw-bold';
+}
+
+function toggleBoxMarginMode() {
+    const on = document.getElementById('use-margin-box').checked;
+    document.getElementById('f_sell_box').readOnly        = on;
+    document.getElementById('f_sell_box').style.background = on ? '#f8f9fa' : '';
+    document.getElementById('box-margin-preview').style.display     = on ? 'none' : '';
+    document.getElementById('box-margin-input-wrap').style.display  = on ? ''     : 'none';
+    if (on) {
+        const upb     = Math.max(1, parseInt(document.getElementById('f_upb').value || 1));
+        const cost    = parseFloat(document.getElementById('f_cost').value || 0);
+        const boxSell = parseFloat(document.getElementById('f_sell_box').value || 0);
+        const boxCost = cost * upb;
+        if (boxSell > 0 && boxCost > 0) {
+            document.getElementById('f_box_margin_pct').value = ((boxSell - boxCost) / boxSell * 100).toFixed(1);
+        }
+        calcBoxSellFromMargin();
+    } else {
+        document.getElementById('f_sell_box').value = '';
+        document.getElementById('box-margin-sell-preview').textContent = '';
+        calcBoxPrice();
+    }
+}
+
+function calcBoxSellFromMargin() {
+    const upb     = Math.max(1, parseInt(document.getElementById('f_upb').value || 1));
+    const cost    = parseFloat(document.getElementById('f_cost').value || 0);
+    const boxCost = cost * upb;
+    const pct     = parseFloat(document.getElementById('f_box_margin_pct').value);
+    const preview = document.getElementById('box-margin-sell-preview');
+    if (isNaN(pct) || pct === 0) {
+        preview.textContent = ''; document.getElementById('f_sell_box').value = ''; return;
+    }
+    if (pct >= 100) {
+        preview.textContent = 'Invalid — must be less than 100%';
+        preview.className   = 'form-text text-danger fw-bold';
+        document.getElementById('f_sell_box').value = ''; return;
+    }
+    if (boxCost <= 0) {
+        preview.textContent = 'Enter cost per box first';
+        preview.className   = 'form-text text-muted'; return;
+    }
+    const boxSell = boxCost / (1 - pct / 100);
+    if (document.getElementById('f_sell_box')?.dataset.cur === 'lbp') prodToggleCur('f_sell_box', 'usd');
+    document.getElementById('f_sell_box').value = boxSell.toFixed(4);
+    preview.textContent = '→ Box sell: $' + boxSell.toFixed(2) + ' ($' + (boxSell / upb).toFixed(4) + '/unit)';
+    preview.className   = 'form-text text-success fw-bold';
+}
+
+document.getElementById('f_cost')?.addEventListener('input', () => {
+    calcMargin();
+    if (document.getElementById('use-margin-box')?.checked) calcBoxSellFromMargin();
+});
+document.getElementById('f_sell')?.addEventListener('input', calcMargin);
+
+// ── Currency toggle (products.php) ───────────────────────────────────────────
+const PROD_RATE = <?= EXCHANGE_RATE ?>;
+
+function prodToggleCur(fieldId, newCur) {
+    const inp = document.getElementById(fieldId);
+    if (!inp) return;
+    const oldCur = inp.dataset.cur || 'usd';
+    if (oldCur === newCur) return;
+    const val = parseFloat(inp.value) || 0;
+    if (newCur === 'lbp' && val > 0) { inp.value = Math.round(val * PROD_RATE); inp.step = '1'; }
+    else if (newCur === 'usd' && val > 0) { inp.value = (val / PROD_RATE).toFixed(4); inp.step = '0.0001'; }
+    inp.dataset.cur = newCur;
+    const uBtn = document.getElementById(fieldId + '_usd');
+    const lBtn = document.getElementById(fieldId + '_lbp');
+    if (uBtn) { uBtn.classList.toggle('opacity-50', newCur !== 'usd'); uBtn.style.fontWeight = newCur==='usd'?'bold':'normal'; }
+    if (lBtn) { lBtn.classList.toggle('opacity-50', newCur !== 'lbp'); lBtn.style.fontWeight = newCur==='lbp'?'bold':'normal'; }
+    prodUpdateHint(fieldId);
+    calcMargin();
+}
+
+function prodUpdateHint(fieldId) {
+    const inp  = document.getElementById(fieldId);
+    const hint = document.getElementById(fieldId + '_hint');
+    if (!inp || !hint) return;
+    const val = parseFloat(inp.value) || 0;
+    const cur = inp.dataset.cur || 'usd';
+    if (!val) { hint.textContent = ''; return; }
+    hint.textContent = cur === 'lbp'
+        ? '≈ $' + (val / PROD_RATE).toFixed(2)
+        : '≈ L£ ' + Math.round(val * PROD_RATE).toLocaleString();
+}
+
+function prodResetCur(fieldId) {
+    const inp = document.getElementById(fieldId);
+    if (inp) { inp.dataset.cur = 'usd'; inp.step = '0.0001'; }
+    const uBtn = document.getElementById(fieldId + '_usd');
+    const lBtn = document.getElementById(fieldId + '_lbp');
+    if (uBtn) { uBtn.classList.remove('opacity-50'); uBtn.style.fontWeight = 'bold'; }
+    if (lBtn) { lBtn.classList.add('opacity-50');    lBtn.style.fontWeight = 'normal'; }
+    const hint = document.getElementById(fieldId + '_hint');
+    if (hint) hint.textContent = '';
+}
+
+// Convert LBP fields to USD before product form submission
+document.querySelector('#productModal form')?.addEventListener('submit', function() {
+    ['f_cost','f_sell','f_cons_cost','f_sell_box'].forEach(fieldId => {
+        const inp = document.getElementById(fieldId);
+        if (!inp) return;
+        const cur = inp.dataset.cur || 'usd';
+        const val = parseFloat(inp.value) || 0;
+        if (cur === 'lbp' && val > 0) { inp.value = (val / PROD_RATE).toFixed(4); inp.dataset.cur = 'usd'; }
+    });
+});
+
+// ── New Category modal ────────────────────────────────────────────────────────
+let _newCatTarget = null;
+function openNewCatModal(selectId) {
+    _newCatTarget = selectId;
+    document.getElementById('newCatName').value = '';
+    document.getElementById('newCatError').textContent = '';
+    new bootstrap.Modal(document.getElementById('newCatModal')).show();
+    setTimeout(() => document.getElementById('newCatName').focus(), 300);
+}
+
+function saveNewCategory() {
+    const name = document.getElementById('newCatName').value.trim();
+    if (!name) { document.getElementById('newCatError').textContent = 'Name required.'; return; }
+    fetch('/stockpro/pages/api.php?action=create_category', {
+        method:'POST',
+        headers:{'Content-Type':'application/x-www-form-urlencoded'},
+        body:'name=' + encodeURIComponent(name)
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (!d.ok) { document.getElementById('newCatError').textContent = d.error||'Error'; return; }
+        // Add to ALL category selects on this page
+        document.querySelectorAll('select[name="category_id"]').forEach(sel => {
+            if (!sel.querySelector(`option[value="${d.id}"]`)) {
+                const opt = new Option(d.name, d.id);
+                sel.appendChild(opt);
+            }
+            if (sel.id === _newCatTarget) sel.value = d.id;
+        });
+        bootstrap.Modal.getInstance(document.getElementById('newCatModal'))?.hide();
+    })
+    .catch(() => { document.getElementById('newCatError').textContent = 'Network error'; });
+}
+
+// ── Generate barcode ─────────────────────────────────────────────────────────
+function generateBarcode() {
+    fetch('/stockpro/pages/api.php?action=generate_barcode')
+        .then(r => r.json())
+        .then(d => {
+            document.getElementById('f_barcode').value = d.barcode;
+        });
+}
+
+// ── Selection & print ─────────────────────────────────────────────────────────
+function updateSelection() {
+    const checked = document.querySelectorAll('.prod-chk:checked');
+    const btn     = document.getElementById('print-barcodes-btn');
+    const cnt     = document.getElementById('sel-count');
+    cnt.textContent = checked.length;
+    btn.classList.toggle('d-none', checked.length === 0);
+}
+
+function toggleAll(master) {
+    document.querySelectorAll('.prod-chk').forEach(c => c.checked = master.checked);
+    updateSelection();
+}
+
+function printSelectedBarcodes() {
+    const ids = [...document.querySelectorAll('.prod-chk:checked')]
+        .map(c => c.value).join(',');
+    window.open('/stockpro/pages/print_barcodes.php?ids=' + ids, '_blank');
+}
+
+// ── Low Stock Order Preview ───────────────────────────────────────────────────
+const LS_ITEMS = <?= json_encode(array_map(fn($r) => [
+    'id'      => (int)$r['id'],
+    'name'    => $r['name'],
+    'sup'     => $r['sup_name'] ?? '',
+    'stock'   => (float)$r['stock'],
+    'alert'   => (float)$r['low_stock_alert'],
+    'unit'    => $r['unit'] ?: 'pcs',
+    'cost'    => (float)$r['cost_price'],
+    'upb'     => (int)$r['units_per_box'],
+], $lowStockModal)) ?>;
+
+let lsRows = [];
+
+function openLowStockModal() {
+    lsRows = LS_ITEMS.map(p => {
+        const isBox   = p.upb > 1;
+        const boxCost = isBox ? p.cost * p.upb : p.cost;
+        const gap     = Math.max(0, p.alert - p.stock);
+        const qty     = Math.max(1, Math.ceil(isBox ? gap / p.upb : gap));
+        return { ...p, boxCost, qty, removed: false };
+    });
+    renderLsTable();
+    new bootstrap.Modal(document.getElementById('lowStockModal')).show();
+}
+
+function renderLsTable() {
+    const tbody = document.getElementById('ls-tbody');
+    tbody.innerHTML = lsRows.map((r, i) => {
+        if (r.removed) return '';
+        const total    = r.qty * r.boxCost;
+        const costCell = r.upb > 1
+            ? `$${r.cost.toFixed(2)}/unit &nbsp;<strong>$${r.boxCost.toFixed(2)}/box</strong>`
+            : `$${r.cost.toFixed(2)}`;
+        const qtyLabel = r.upb > 1 ? 'boxes' : r.unit;
+        return `<tr>
+            <td>${lsEsc(r.name)}<br><small class="text-muted">${lsEsc(r.sup)}</small></td>
+            <td class="text-center"><span class="${r.stock==0?'text-danger fw-bold':'text-warning fw-bold'}">${r.stock}</span> / ${r.alert}</td>
+            <td>${costCell}</td>
+            <td style="width:110px">
+                <div class="input-group input-group-sm">
+                    <input type="number" class="form-control form-control-sm" min="0" step="1" value="${r.qty}" onchange="lsSetQty(${i},this.value)">
+                    <span class="input-group-text px-1 text-muted" style="font-size:.7rem">${lsEsc(qtyLabel)}</span>
+                </div>
+            </td>
+            <td class="fw-bold text-end" id="ls-tot-${i}">$${total.toFixed(2)}</td>
+            <td class="text-center"><button class="btn btn-outline-danger btn-sm py-0 px-1" onclick="lsRemove(${i})"><i class="bi bi-trash"></i></button></td>
+        </tr>`;
+    }).join('');
+    updateLsGrand();
+}
+
+function lsSetQty(i, val) {
+    lsRows[i].qty = Math.max(0, parseFloat(val) || 0);
+    const el = document.getElementById('ls-tot-' + i);
+    if (el) el.textContent = '$' + (lsRows[i].qty * lsRows[i].boxCost).toFixed(2);
+    updateLsGrand();
+}
+
+function lsRemove(i) {
+    lsRows[i].removed = true;
+    renderLsTable();
+}
+
+function updateLsGrand() {
+    const grand = lsRows.filter(r => !r.removed).reduce((s, r) => s + r.qty * r.boxCost, 0);
+    const el = document.getElementById('ls-grand');
+    if (el) el.textContent = '$' + grand.toFixed(2);
+}
+
+function lsEsc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function generateLowStockPDF() {
+    const active = lsRows.filter(r => !r.removed && r.qty > 0);
+    if (!active.length) { alert('No items to print.'); return; }
+    const grand = active.reduce((s, r) => s + r.qty * r.boxCost, 0);
+    const rows  = active.map((r, n) => {
+        const isBox    = r.upb > 1;
+        const costCell = isBox
+            ? `$${r.cost.toFixed(2)}/unit ($${r.boxCost.toFixed(2)}/box)`
+            : `$${r.cost.toFixed(2)}`;
+        const qtyLabel = isBox ? `${r.qty} box${r.qty>1?'es':''}` : `${r.qty} ${lsEsc(r.unit)}`;
+        return `<tr>
+            <td>${n+1}</td><td>${lsEsc(r.name)}</td><td>${lsEsc(r.sup)}</td>
+            <td class="${r.stock==0?'out':'low'}">${r.stock}</td>
+            <td>${r.alert}</td>
+            <td>${costCell}</td>
+            <td>${qtyLabel}</td>
+            <td style="text-align:right">$${(r.qty*r.boxCost).toFixed(2)}</td>
+        </tr>`;
+    }).join('');
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Low Stock Order Preview</title>
+<style>
+@page{size:A4 portrait;margin:15mm}body{font-family:Arial,sans-serif;font-size:11px}
+h2{margin:0 0 3px;font-size:15px}p.sub{margin:0 0 10px;color:#666;font-size:10px}
+table{width:100%;border-collapse:collapse}
+th{background:#222;color:#fff;padding:5px 7px;text-align:left;font-size:10px}
+td{padding:4px 7px;border-bottom:1px solid #ddd;font-size:10px}
+tr:nth-child(even) td{background:#f9f9f9}.out{color:#c00;font-weight:bold}.low{color:#b06000}
+tfoot td{background:#eee;font-weight:bold;border-top:2px solid #333}
+</style></head><body>
+<h2>Low Stock Order Preview</h2>
+<p class="sub">Generated: ${new Date().toLocaleString()} &nbsp;|&nbsp; ${active.length} item(s)</p>
+<table>
+<thead><tr><th>#</th><th>Product</th><th>Supplier</th><th>In Stock</th><th>Min</th><th>Last Cost</th><th>Qty to Order</th><th style="text-align:right">Total</th></tr></thead>
+<tbody>${rows}</tbody>
+<tfoot><tr><td colspan="7" style="text-align:right">Grand Total</td><td style="text-align:right">$${grand.toFixed(2)}</td></tr></tfoot>
+</table>
+<script>window.onload=function(){window.print();};<\/script>
+</body></html>`;
+    const w = window.open('', '_blank');
+    w.document.write(html);
+    w.document.close();
+}
+
+// ── Batch viewer ──────────────────────────────────────────────────────────────
+function viewBatches(productId, productName) {
+    document.getElementById('batch-modal-title').textContent = productName + ' — Batches';
+    const body = document.getElementById('batch-modal-body');
+    body.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm"></div> Loading…</div>';
+    const modal = new bootstrap.Modal(document.getElementById('batchModal'));
+    modal.show();
+
+    fetch(`/stockpro/pages/api.php?action=get_batches&product_id=${productId}`)
+        .then(r => r.json())
+        .then(batches => {
+            if (!batches.length) { body.innerHTML = '<p class="text-muted text-center py-3">No batches found.</p>'; return; }
+            const rows = batches.map(b => {
+                const pct = b.quantity_original > 0 ? ((b.quantity_remaining / b.quantity_original) * 100).toFixed(0) : 0;
+                const cls = b.status === 'active' ? 'success' : 'secondary';
+                return `<tr class="${b.status === 'depleted' ? 'table-secondary opacity-75' : ''}">
+                    <td><span class="badge bg-${cls}">#${b.id}</span></td>
+                    <td>${b.purchase_date}</td>
+                    <td class="fw-bold">$${parseFloat(b.cost_price).toFixed(4)}</td>
+                    <td>${parseFloat(b.quantity_original)}</td>
+                    <td class="${b.quantity_remaining <= 0 ? 'text-danger fw-bold' : 'text-success fw-bold'}">${parseFloat(b.quantity_remaining)}</td>
+                    <td>
+                        <div class="progress" style="height:8px;min-width:60px">
+                            <div class="progress-bar bg-${cls}" style="width:${pct}%"></div>
+                        </div>
+                        <div style="font-size:.7rem">${pct}% left</div>
+                    </td>
+                    <td class="small text-muted">${b.reference || '—'}</td>
+                </tr>`;
+            }).join('');
+            body.innerHTML = `
+            <table class="table table-sm table-hover mb-0">
+                <thead class="table-dark"><tr>
+                    <th>Batch</th><th>Date</th><th>Cost Price</th><th>Orig Qty</th><th>Remaining</th><th>Progress</th><th>Ref</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>`;
+        })
+        .catch(() => { body.innerHTML = '<p class="text-danger">Failed to load batches.</p>'; });
+}
+</script>
+
+<!-- Low Stock Order Preview Modal -->
+<div class="modal fade" id="lowStockModal" tabindex="-1">
+<div class="modal-dialog modal-xl">
+<div class="modal-content">
+    <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-cart-check me-2 text-danger"></i>Low Stock — Order Preview</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    </div>
+    <div class="modal-body p-0">
+        <?php if (empty($lowStockModal)): ?>
+        <p class="text-success text-center py-4"><i class="bi bi-check-circle me-2"></i>No low stock items found — all products are above their alert level.</p>
+        <?php else: ?>
+        <table class="table table-sm table-hover mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th>Product / Supplier</th>
+                    <th class="text-center">Stock / Min</th>
+                    <th>Last Cost</th>
+                    <th style="width:100px">Qty to Order</th>
+                    <th class="text-end">Line Total</th>
+                    <th style="width:50px"></th>
+                </tr>
+            </thead>
+            <tbody id="ls-tbody"></tbody>
+            <tfoot class="table-secondary fw-bold border-top border-2">
+                <tr>
+                    <td colspan="4" class="text-end pe-3">Grand Total</td>
+                    <td class="text-end" id="ls-grand">$0.00</td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+        <?php endif; ?>
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <?php if (!empty($lowStockModal)): ?>
+        <button type="button" class="btn btn-danger" onclick="generateLowStockPDF()">
+            <i class="bi bi-file-earmark-pdf me-1"></i>Generate PDF
+        </button>
+        <?php endif; ?>
+    </div>
+</div>
+</div>
+</div>
+
+<!-- Batch Viewer Modal -->
+<div class="modal fade" id="batchModal" tabindex="-1">
+<div class="modal-dialog modal-lg">
+<div class="modal-content">
+    <div class="modal-header">
+        <h5 class="modal-title" id="batch-modal-title"><i class="bi bi-layers me-2"></i>Batches</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    </div>
+    <div class="modal-body p-0" id="batch-modal-body"></div>
+    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>
+</div>
+</div>
+</div>
+
+<!-- New Category Modal -->
+<div class="modal fade" id="newCatModal" tabindex="-1">
+<div class="modal-dialog modal-sm">
+<div class="modal-content">
+    <div class="modal-header py-2"><h6 class="modal-title"><i class="bi bi-tag me-2"></i>New Category</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+        <input type="text" id="newCatName" class="form-control" placeholder="Category name" onkeydown="if(event.key==='Enter'){event.preventDefault();saveNewCategory();}">
+        <div class="text-danger small mt-1" id="newCatError"></div>
+    </div>
+    <div class="modal-footer py-2">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="saveNewCategory()">Save</button>
+    </div>
+</div></div></div>
+
+<?php renderFoot(); ?>
