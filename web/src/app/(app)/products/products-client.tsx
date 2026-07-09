@@ -30,6 +30,16 @@ export type Product = {
 
 type Option = { id: number; name: string };
 
+function generateBarcode(): string {
+  // GS1 restricted-circulation prefix (20-29) reserved for in-store/internal use
+  let data = "20";
+  for (let i = 0; i < 10; i++) data += Math.floor(Math.random() * 10);
+  let sum = 0;
+  for (let i = 0; i < 12; i++) sum += Number(data[i]) * (i % 2 === 0 ? 1 : 3);
+  const checkDigit = (10 - (sum % 10)) % 10;
+  return data + checkDigit;
+}
+
 export default function ProductsClient({
   products,
   categories,
@@ -45,11 +55,28 @@ export default function ProductsClient({
   const [supplierList, setSupplierList] = useState(suppliers);
   const [productSource, setProductSource] = useState<"owned" | "consignment">("owned");
   const [unit, setUnit] = useState("pcs");
+  const [costPrice, setCostPrice] = useState("0");
+  const [sellPrice, setSellPrice] = useState("0");
+  const [unitsPerBox, setUnitsPerBox] = useState("1");
+  const [sellPriceBox, setSellPriceBox] = useState("");
+  const [sellPriceBoxEdited, setSellPriceBoxEdited] = useState(false);
+  const [barcode, setBarcode] = useState("");
+
+  function applySuggestedSellPriceBox(sp: string, upb: string) {
+    const suggested = (parseFloat(sp) || 0) * (parseFloat(upb) || 0);
+    setSellPriceBox(suggested > 0 ? String(Math.round(suggested * 10000) / 10000) : "");
+  }
 
   function openCreate() {
     setEditing(null);
     setProductSource("owned");
     setUnit("pcs");
+    setCostPrice("0");
+    setSellPrice("0");
+    setUnitsPerBox("1");
+    setSellPriceBox("");
+    setSellPriceBoxEdited(false);
+    setBarcode("");
     setOpen(true);
   }
 
@@ -57,8 +84,16 @@ export default function ProductsClient({
     setEditing(p);
     setProductSource(p.product_source);
     setUnit(p.unit ?? "pcs");
+    setCostPrice(String(p.cost_price ?? 0));
+    setSellPrice(String(p.sell_price ?? 0));
+    setUnitsPerBox(String(p.units_per_box ?? 1));
+    setSellPriceBox(p.sell_price_box != null ? String(p.sell_price_box) : "");
+    setSellPriceBoxEdited(p.sell_price_box != null);
+    setBarcode(p.barcode ?? "");
     setOpen(true);
   }
+
+  const costPerBox = (parseFloat(costPrice) || 0) * (parseFloat(unitsPerBox) || 0);
 
   return (
     <div>
@@ -172,12 +207,25 @@ export default function ProductsClient({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium mb-1">Barcode</label>
-              <input
-                name="barcode"
-                placeholder="Scan or leave blank"
-                defaultValue={editing?.barcode ?? ""}
-                className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
-              />
+              <div className="relative">
+                <input
+                  name="barcode"
+                  placeholder="Scan or leave blank"
+                  value={barcode}
+                  onChange={(e) => setBarcode(e.target.value)}
+                  className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm pr-20"
+                />
+                {!barcode && (
+                  <button
+                    type="button"
+                    onClick={() => setBarcode(generateBarcode())}
+                    title="Auto-generate an internal barcode"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-xs px-2 py-1 rounded-md border border-blue-600 text-blue-600 bg-white dark:bg-zinc-900 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                  >
+                    Generate
+                  </button>
+                )}
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Unit</label>
@@ -309,13 +357,16 @@ export default function ProductsClient({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium mb-1">Cost Price</label>
+              <label className="block text-sm font-medium mb-1">Cost Price (per unit)</label>
               <input
                 name="cost_price"
                 type="number"
                 min="0"
                 step="0.0001"
-                defaultValue={editing?.cost_price ?? 0}
+                value={costPrice}
+                onChange={(e) => {
+                  setCostPrice(e.target.value);
+                }}
                 className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
               />
             </div>
@@ -326,7 +377,11 @@ export default function ProductsClient({
                 type="number"
                 min="0"
                 step="0.0001"
-                defaultValue={editing?.sell_price ?? 0}
+                value={sellPrice}
+                onChange={(e) => {
+                  setSellPrice(e.target.value);
+                  if (!sellPriceBoxEdited) applySuggestedSellPriceBox(e.target.value, unitsPerBox);
+                }}
                 className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
               />
             </div>
@@ -341,9 +396,16 @@ export default function ProductsClient({
                   type="number"
                   min="1"
                   step="1"
-                  defaultValue={editing?.units_per_box ?? 1}
+                  value={unitsPerBox}
+                  onChange={(e) => {
+                    setUnitsPerBox(e.target.value);
+                    if (!sellPriceBoxEdited) applySuggestedSellPriceBox(sellPrice, e.target.value);
+                  }}
                   className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
                 />
+                {costPerBox > 0 && (
+                  <p className="text-xs text-zinc-500 mt-1">Cost per box: ${costPerBox.toFixed(4).replace(/0+$/, "").replace(/\.$/, "")}</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Sell Price / Box</label>
@@ -353,9 +415,26 @@ export default function ProductsClient({
                   min="0"
                   step="0.0001"
                   placeholder="Optional"
-                  defaultValue={editing?.sell_price_box ?? ""}
+                  value={sellPriceBox}
+                  onChange={(e) => {
+                    setSellPriceBox(e.target.value);
+                    setSellPriceBoxEdited(true);
+                  }}
                   className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
                 />
+                <p className="text-xs text-zinc-500 mt-1">
+                  Auto-filled as unit price × units per box —{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      applySuggestedSellPriceBox(sellPrice, unitsPerBox);
+                      setSellPriceBoxEdited(false);
+                    }}
+                    className="text-blue-600 hover:underline"
+                  >
+                    reset to suggested
+                  </button>
+                </p>
               </div>
             </div>
           )}
