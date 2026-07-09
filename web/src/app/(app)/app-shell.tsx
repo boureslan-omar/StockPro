@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -51,7 +51,7 @@ const NAV_SECTIONS = [
   },
 ];
 
-const COLLAPSE_KEY = "stockpro-sidebar-collapsed";
+const COLLAPSE_COOKIE = "sidebar-collapsed";
 
 export default function AppShell({
   children,
@@ -61,6 +61,7 @@ export default function AppShell({
   orgName,
   licenseStatus,
   memberCount,
+  initialCollapsed,
 }: {
   children: React.ReactNode;
   userLabel: string;
@@ -69,21 +70,19 @@ export default function AppShell({
   orgName: string;
   licenseStatus: string;
   memberCount: number;
+  initialCollapsed: boolean;
 }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setCollapsed(localStorage.getItem(COLLAPSE_KEY) === "1");
-    setMounted(true);
-  }, []);
+  // Seeded from a cookie the server already read, so the very first paint
+  // (server-rendered, before hydration) already matches the user's saved
+  // preference — no flash of the wrong width on load.
+  const [collapsed, setCollapsed] = useState(initialCollapsed);
 
   function toggleCollapsed() {
     setCollapsed((prev) => {
       const next = !prev;
-      localStorage.setItem(COLLAPSE_KEY, next ? "1" : "0");
+      document.cookie = `${COLLAPSE_COOKIE}=${next ? "1" : "0"}; path=/; max-age=31536000`;
       return next;
     });
   }
@@ -95,9 +94,7 @@ export default function AppShell({
     <div className="min-h-screen flex bg-zinc-50 dark:bg-zinc-950">
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-60 relative ${
-          mounted ? sidebarWidth : ""
-        } bg-[#111c42] text-white flex flex-col transition-[transform,width] duration-200 md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 w-60 relative ${sidebarWidth} bg-[#111c42] text-white flex flex-col transition-[transform,width] duration-200 md:translate-x-0 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -163,7 +160,7 @@ export default function AppShell({
       {mobileOpen && <div className="fixed inset-0 bg-black/40 z-30 md:hidden" onClick={() => setMobileOpen(false)} />}
 
       {/* Main column */}
-      <div className={`flex-1 flex flex-col min-w-0 transition-[padding] duration-200 ${mounted ? contentPad : "md:pl-60"}`}>
+      <div className={`flex-1 flex flex-col min-w-0 transition-[padding] duration-200 ${contentPad}`}>
         <header className="sticky top-0 z-20 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
           <div className="flex items-center gap-3 px-4 h-16">
             <button onClick={() => setMobileOpen(true)} className="md:hidden text-zinc-500 hover:text-zinc-900 dark:hover:text-white">
@@ -179,7 +176,7 @@ export default function AppShell({
             <LogoutButton />
           </div>
         </header>
-        <main className="flex-1 p-4 md:p-6 max-w-7xl w-full mx-auto">{children}</main>
+        <main className="flex-1 p-4 md:p-6 w-full">{children}</main>
       </div>
     </div>
   );

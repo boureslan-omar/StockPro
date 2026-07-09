@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentOrg } from "@/lib/org";
@@ -44,9 +45,10 @@ export default async function AppLayout({
     );
   }
 
-  const [{ memberships, currentOrgId }, { count: memberCount }] = await Promise.all([
+  const [{ memberships, currentOrgId }, { count: memberCount }, cookieStore] = await Promise.all([
     getMyMemberships(),
     supabase.from("org_memberships").select("id", { count: "exact", head: true }).eq("organization_id", org.id),
+    cookies(),
   ]);
 
   return (
@@ -57,6 +59,7 @@ export default async function AppLayout({
       orgName={org.name}
       licenseStatus={org.license_status}
       memberCount={memberCount ?? 0}
+      initialCollapsed={cookieStore.get("sidebar-collapsed")?.value === "1"}
     >
       {children}
     </AppShell>

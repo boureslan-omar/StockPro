@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, Suspense } from "react";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { getMyMemberships } from "../(app)/org-actions";
@@ -87,10 +88,23 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <main className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950 px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-8 shadow-sm">
-        <h1 className="text-2xl font-bold mb-1">StockPro</h1>
-        <p className="text-sm text-zinc-500 mb-6">
+    <main className="relative min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950 px-4 overflow-hidden">
+      {/* Fixed brand background — always the StockPro mark, regardless of any
+          per-organization logo customization applied elsewhere in the app.
+          Tiled so the whole viewport reads as branded, not just one faded
+          center image; the card in front stays opaque enough to stay legible. */}
+      <div
+        className="absolute inset-0 pointer-events-none select-none opacity-[0.15] dark:opacity-20"
+        style={{ backgroundImage: "url(/logo.png)", backgroundRepeat: "repeat", backgroundSize: "360px auto" }}
+      />
+
+      <div className="relative w-full max-w-sm rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-8 shadow-lg">
+        <div className="flex justify-center mb-4">
+          <div className="rounded-xl overflow-hidden shadow-sm">
+            <Image src="/logo.png" alt="StockPro" width={220} height={120} priority className="h-auto w-44 block" />
+          </div>
+        </div>
+        <p className="text-sm text-zinc-500 text-center mb-6">
           Warehouse &amp; wholesale management
         </p>
         <Suspense>
