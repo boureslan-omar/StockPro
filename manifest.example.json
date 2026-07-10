@@ -1,7 +1,0 @@
-﻿{
-    "version": "3.1.0",
-    "release_date": "2026-06-16",
-    "download_url": "https://github.com/YOUR_USERNAME/YOUR_REPO/releases/download/v3.1.0/stockpro.zip",
-    "upgrades": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-    "changelog": "v3.1.0 — Returns, per-row purchase type, customer balance fix, combined upgrade_all.php"
-}

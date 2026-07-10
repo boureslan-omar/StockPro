@@ -1,41 +1,51 @@
 # StockPro — Claude Context
 
-StockPro is a **separate POS/inventory product** targeting warehouses and wholesale businesses.
-It was bootstrapped from the dahdouh mini market codebase (v3.2.1) but is now an independent project
-with its own feature roadmap, its own GitHub repo (to be created), and its own database.
+StockPro is a multi-tenant warehouse/wholesale POS & inventory SaaS. The original PHP/XAMPP prototype
+(dahdouh mini-market fork) has been fully replaced by a Next.js + Supabase rewrite — this repo now
+contains only the current app.
 
 ## Core identity
-- **Product:** Warehouse & wholesale management system
-- **NOT** a mini market POS — different business model, different features needed
-- Working directory: `c:\xampp\htdocs\stockpro\`
-- URL: `http://localhost/stockpro/`
-- Database: `pos_stockpro`
-- Version at fork: **v3.2.1** (dahdouh base)
+- **Product:** Multi-tenant warehouse & wholesale management system (POS, inventory, purchasing, reports)
+- Repo root: this directory. App code lives under `web/`.
+- Deployed: Vercel (`stockpro-drab.vercel.app`), Supabase (Postgres + Auth + Storage)
 
 ## Tech stack
-- PHP 8+ / MySQL (MariaDB 10.4) / XAMPP
-- No framework — plain PDO, Bootstrap 5, vanilla JS fetch API
-- Bootstrap Icons for UI
+- Next.js 16 (App Router, Turbopack), TypeScript, Tailwind v4
+- Supabase: Postgres + Auth + Storage + RLS
+- `lucide-react` for icons
 
-## Architecture (inherited, may diverge)
-- `includes/config.php` — DB connection (`pos_stockpro`), auth, `requireRole()`, `checkLicense()`
-- `includes/layout.php` — `renderHead()`, `renderNav()` (scrollable navbar, uiScale)
-- `includes/license.php` — RSA machine-locked license
-- `pages/api.php` — all AJAX endpoints
-- `assets/css/pos.css` — CSS custom properties (`--ui-scale`)
+## Architecture
+- `web/src/app/(app)/<module>/` — one folder per feature (pos, products, purchases, purchase-orders,
+  suppliers, customers, quotations, returns, wastage, audits, expenses, cash-register, reports, settings)
+  Each typically has `page.tsx` (Server Component, data fetch) + a `*-client.tsx` (interactivity) + `actions.ts` (Server Actions)
+- `web/src/app/(app)/app-shell.tsx` — sidebar/topbar shell shared by all authenticated pages
+- `web/src/app/(app)/org-actions.ts`, `org-switcher.tsx` — multi-org membership & switching
+- `web/src/lib/supabase/` — `server.ts`/`client.ts` (RLS-scoped) and `admin.ts` (service-role, server-only)
+- `web/src/lib/org.ts` — `getCurrentOrg()`: fetch the current org explicitly by id (don't rely on RLS + `.single()`)
+- `supabase/migrations/*.sql` — applied via the Supabase Management API (no local Supabase CLI in this workflow)
 
-## Key design decisions (inherited)
-- All prices stored in **USD**; LBP displayed via exchange rate from `settings` table
-- FIFO batch stock for regular products
-- Customer ledger: positive = credit, negative = debt
-- `date_default_timezone_set('Asia/Beirut')` in config.php — do not remove
+## Multi-tenancy
+- `organizations` is the tenant table; every business table has an `organization_id` column + RLS scoped to it
+- `current_org_id()` (SQL function) reads `organization_id` from the JWT's `app_metadata`
+- `org_memberships` (user_id, organization_id, role) lets one login belong to multiple orgs
+- Switching orgs = rewriting the user's `app_metadata.organization_id` via the Admin API, then
+  `supabase.auth.refreshSession()` + full navigation reload — no RLS policy needs to change for this
+- Any unique constraint on business data (barcode, receipt_no, po_number, etc.) must be scoped
+  `unique(organization_id, ...)`, never global
 
-## GitHub
-- New dedicated repo to be created for stockpro
-- Auto-update disabled for now (manifest URL blank in settings)
-- License tools remain in `dahdouh/tools/` — never copy to stockpro
+## Key business rules
+- All prices stored in **USD**; LBP is a display-only conversion via the exchange rate in `settings`
+- FIFO batch stock for regular products; `product_type: "bulk"` items skip batch tracking
+- Customer/supplier ledger sign convention: positive = credit (we owe them / they've overpaid), negative = debt
 
-## Security rules (never violate)
-- `dahdouh/tools/private_key.pem` must NEVER be deployed anywhere
-- `pos-license-vault` GitHub repo must stay private
-- New features for stockpro go here only — do not back-port to dahdouh unless explicitly asked
+## Gotchas worth remembering
+- Server Action thrown errors get redacted to a generic message in production builds — return
+  `{ ok, message }` from actions that can meaningfully fail instead of throwing
+- Broadening an RLS SELECT policy can silently break code elsewhere that assumed `.single()`/`.maybeSingle()`
+  always got exactly one row — audit callers when a policy is loosened
+- Read this repo's own `web/AGENTS.md` before touching Next.js APIs — this version has breaking changes
+  vs. what most training data expects
+
+## Security rules
+- `SUPABASE_SERVICE_ROLE_KEY` is server-only (used for org switching, admin backfills) — never expose to the client
+- Supabase personal access tokens used for one-off migrations should be revoked once the migration is applied
