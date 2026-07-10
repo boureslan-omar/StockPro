@@ -96,7 +96,7 @@ export default async function WastagePage({
             </div>
             <ExpiryScanButton />
           </div>
-          <div className="overflow-x-auto rounded-lg border border-zinc-100 dark:border-zinc-800">
+          <div className="overflow-x-auto rounded-lg border border-zinc-100 dark:border-zinc-800 pr-3">
             <table className="w-full text-sm">
               <thead className="text-zinc-500 text-left bg-zinc-50 dark:bg-zinc-800/60">
                 <tr>
@@ -112,7 +112,7 @@ export default async function WastagePage({
                   const expired = b.expiry_date < now.toISOString().slice(0, 10);
                   const value = Number(b.quantity_remaining) * Number(b.cost_price);
                   return (
-                    <tr key={b.id} className="border-t border-zinc-100 dark:border-zinc-800">
+                    <tr key={b.id} className="border-t border-zinc-100 dark:border-zinc-800 pr-3">
                       <td className="px-3 py-1.5">{b.products?.name ?? "—"}</td>
                       <td className="px-3 py-1.5 text-right">
                         {Number(b.quantity_remaining)} {b.products?.unit ?? ""}
@@ -164,7 +164,7 @@ export default async function WastagePage({
         <button className="rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm">Filter</button>
       </form>
 
-      <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
+      <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800 pr-3">
         <table className="w-full text-sm bg-white dark:bg-zinc-900">
           <thead>
             <tr className="border-b border-zinc-200 dark:border-zinc-800 text-left text-zinc-500">

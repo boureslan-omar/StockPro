@@ -163,7 +163,7 @@ export default async function SuppliersPage({
           </div>
         )}
 
-        <div>
+        <div className={viewSupplier ? "" : "lg:col-span-2"}>
           <SuppliersClient suppliers={suppliers} viewId={viewId} search={search} />
         </div>
       </div>

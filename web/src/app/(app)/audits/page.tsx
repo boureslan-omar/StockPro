@@ -67,7 +67,7 @@ export default async function AuditsPage({
           </div>
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
+        <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800 pr-3">
           <table className="w-full text-sm bg-white dark:bg-zinc-900">
             <thead>
               <tr className="border-b border-zinc-200 dark:border-zinc-800 text-left text-zinc-500">
@@ -152,7 +152,7 @@ export default async function AuditsPage({
         <AuditForm products={productsForForm} categories={categories ?? []} />
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
+      <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800 pr-3">
         <table className="w-full text-sm bg-white dark:bg-zinc-900">
           <thead>
             <tr className="border-b border-zinc-200 dark:border-zinc-800 text-left text-zinc-500">

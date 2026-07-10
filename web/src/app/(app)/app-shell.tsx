@@ -94,7 +94,7 @@ export default function AppShell({
     <div className="min-h-screen flex bg-zinc-50 dark:bg-zinc-950">
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-60 relative ${sidebarWidth} bg-[#111c42] text-white flex flex-col transition-[transform,width] duration-200 md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 w-60 ${sidebarWidth} bg-[#111c42] text-white flex flex-col transition-[transform,width] duration-200 md:translate-x-0 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -111,11 +111,14 @@ export default function AppShell({
         <nav className={`flex-1 overflow-y-auto overflow-x-hidden py-4 px-2 ${collapsed ? "space-y-2" : "space-y-5"}`}>
           {NAV_SECTIONS.map((section, i) => (
             <div key={section.label}>
-              {collapsed ? (
-                i > 0 && <div className="mx-2 mb-2 border-t border-white/10" />
-              ) : (
-                <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/35">{section.label}</p>
-              )}
+              {i > 0 && collapsed && <div className="mx-2 mb-2 border-t border-white/10" />}
+              <p
+                className={`mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/35 leading-tight ${
+                  collapsed ? "text-center px-1 whitespace-normal break-words" : "px-3"
+                }`}
+              >
+                {section.label}
+              </p>
               <div className="space-y-0.5">
                 {section.items.map((item) => {
                   const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);

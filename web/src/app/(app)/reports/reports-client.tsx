@@ -173,7 +173,7 @@ export default function ReportsClient({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4">
           <h3 className="font-semibold mb-3">Top Products by Profit</h3>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto pr-3">
             <table className="w-full text-sm">
               <thead className="text-zinc-500 text-left">
                 <tr>
@@ -309,7 +309,7 @@ export default function ReportsClient({
 
       <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4">
         <h3 className="font-semibold mb-3">Period Detail</h3>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto pr-3">
           <table className="w-full text-sm">
             <thead className="bg-zinc-900 text-white text-left">
               <tr>

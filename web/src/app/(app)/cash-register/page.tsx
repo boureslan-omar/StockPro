@@ -133,7 +133,7 @@ export default async function CashRegisterPage({
         <button className="rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm">Filter</button>
       </form>
 
-      <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800 mb-6">
+      <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800 pr-3 mb-6">
         <table className="w-full text-sm bg-white dark:bg-zinc-900">
           <thead>
             <tr className="border-b border-zinc-200 dark:border-zinc-800 text-left text-zinc-500">
@@ -185,7 +185,7 @@ export default async function CashRegisterPage({
       {shiftHistory && shiftHistory.length > 0 && (
         <>
           <h2 className="font-semibold mb-3">Shift History</h2>
-          <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800 pr-3">
             <table className="w-full text-sm bg-white dark:bg-zinc-900">
               <thead>
                 <tr className="border-b border-zinc-200 dark:border-zinc-800 text-left text-zinc-500">

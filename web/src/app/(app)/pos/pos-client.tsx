@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Package } from "lucide-react";
 import { processSale, getReceiptData, type CartLine } from "./actions";
 import { printReceiptWindow } from "./receipt";
 import { linkQuotationToSale } from "../quotations/actions";
@@ -243,28 +244,25 @@ export default function PosClient({
     }
   }
 
-  async function print(format: "thermal" | "a4") {
+  async function print() {
     if (!lastSaleId) return;
     const { sale, items } = await getReceiptData(lastSaleId);
     if (!sale) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    printReceiptWindow(sale as any, items as any, format, storeName, storeAddress, storePhone);
+    printReceiptWindow(sale as any, items as any, storeName, storeAddress, storePhone);
   }
 
   if (lastSaleId) {
     return (
-      <div className="max-w-md mx-auto rounded-xl border border-green-500 bg-white dark:bg-zinc-900 p-6 text-center">
+      <div className="max-w-md mx-auto rounded-xl border border-green-500 bg-white dark:bg-zinc-900 shadow-sm p-6 text-center">
         <h2 className="text-xl font-bold text-green-600 mb-2">Sale Complete</h2>
         <p className="text-sm text-zinc-500 mb-4">Receipt #{lastReceipt}</p>
         <div className="flex gap-2 justify-center mb-4">
-          <button onClick={() => print("thermal")} className="rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white text-sm px-4 py-2">
-            Print Thermal
-          </button>
-          <button onClick={() => print("a4")} className="rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm px-4 py-2">
-            Print A4
+          <button onClick={print} className="rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm px-4 py-2">
+            Print
           </button>
         </div>
-        <button onClick={() => setLastSaleId(null)} className="text-sm text-blue-600 hover:underline">
+        <button onClick={() => setLastSaleId(null)} className="text-sm text-blue-500 hover:underline">
           Start New Sale
         </button>
       </div>
@@ -303,12 +301,15 @@ export default function PosClient({
                 key={p.id}
                 onClick={() => addProduct(p)}
                 disabled={low}
-                className={`text-left rounded-lg border p-3 text-sm ${
+                className={`text-left rounded-lg border p-3 text-sm shadow-sm transition ${
                   low
                     ? "border-zinc-200 dark:border-zinc-800 opacity-40 cursor-not-allowed"
-                    : "border-zinc-200 dark:border-zinc-800 hover:border-blue-500 bg-white dark:bg-zinc-900"
+                    : "border-zinc-200 dark:border-zinc-800 hover:border-blue-500 hover:shadow-md bg-white dark:bg-zinc-900"
                 }`}
               >
+                <div className="mb-2 flex items-center justify-center rounded-md bg-zinc-100 dark:bg-zinc-800 h-16 w-full">
+                  <Package className="h-6 w-6 text-zinc-400" />
+                </div>
                 <p className="font-medium truncate">{p.name}</p>
                 <p className="text-xs text-zinc-500">
                   {p.sell_price > 0 ? `$${Number(p.sell_price).toFixed(2)}` : "No price set"}

@@ -46,16 +46,10 @@ export default function QuotationDetailActions({
         ))}
       </select>
       <button
-        onClick={() => printQuotationWindow(quote, items, "thermal", storeName, storeAddress, storePhone)}
+        onClick={() => printQuotationWindow(quote, items, storeName, storeAddress, storePhone)}
         className="text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 px-2.5 py-1.5"
       >
-        Print Thermal
-      </button>
-      <button
-        onClick={() => printQuotationWindow(quote, items, "a4", storeName, storeAddress, storePhone)}
-        className="text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 px-2.5 py-1.5"
-      >
-        Print A4
+        Print
       </button>
     </div>
   );

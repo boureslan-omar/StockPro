@@ -135,7 +135,7 @@ export default async function CustomersPage({
           </div>
         )}
 
-        <div>
+        <div className={viewCustomer ? "" : "lg:col-span-2"}>
           <CustomersClient customers={customers ?? []} viewId={viewId} search={search} />
         </div>
       </div>

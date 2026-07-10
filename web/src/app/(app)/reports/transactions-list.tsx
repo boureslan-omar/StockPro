@@ -51,12 +51,12 @@ export default function TransactionsList({
   const [expanded, setExpanded] = useState<number | null>(null);
   const [printing, setPrinting] = useState<number | null>(null);
 
-  async function handlePrint(saleId: number, format: "thermal" | "a4") {
+  async function handlePrint(saleId: number) {
     setPrinting(saleId);
     try {
       const { sale, items } = await getReceiptData(saleId);
       if (!sale) return;
-      printReceiptWindow(sale as never, items as never, format, storeName, storeAddress, storePhone);
+      printReceiptWindow(sale as never, items as never, storeName, storeAddress, storePhone);
     } finally {
       setPrinting(null);
     }
@@ -68,7 +68,7 @@ export default function TransactionsList({
         <h3 className="font-semibold">All Transactions</h3>
         <span className="text-xs px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500">{transactions.length} sales</span>
       </div>
-      <div className="overflow-x-auto max-h-[460px] overflow-y-auto rounded-lg border border-zinc-100 dark:border-zinc-800">
+      <div className="overflow-x-auto max-h-[460px] overflow-y-auto rounded-lg border border-zinc-100 dark:border-zinc-800 pr-3">
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-zinc-900 text-white">
             <tr className="text-left">
@@ -108,11 +108,8 @@ export default function TransactionsList({
                     <button onClick={() => setExpanded(expanded === tx.id ? null : tx.id)} className="text-blue-600 hover:underline mr-2">
                       {expanded === tx.id ? "Hide" : "View"}
                     </button>
-                    <button disabled={printing === tx.id} onClick={() => handlePrint(tx.id, "thermal")} className="text-zinc-600 dark:text-zinc-300 hover:underline mr-2 disabled:opacity-50">
-                      Thermal
-                    </button>
-                    <button disabled={printing === tx.id} onClick={() => handlePrint(tx.id, "a4")} className="text-zinc-600 dark:text-zinc-300 hover:underline mr-2 disabled:opacity-50">
-                      A4
+                    <button disabled={printing === tx.id} onClick={() => handlePrint(tx.id)} className="text-zinc-600 dark:text-zinc-300 hover:underline mr-2 disabled:opacity-50">
+                      Print
                     </button>
                     {!tx.is_void && <VoidButton saleId={tx.id} receiptNo={tx.receipt_no} />}
                   </td>
