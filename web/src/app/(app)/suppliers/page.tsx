@@ -82,7 +82,7 @@ export default async function SuppliersPage({
 
       <div className="grid lg:grid-cols-[380px_1fr] gap-4">
         {viewSupplier && (
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 order-1 lg:order-none">
+          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4 order-1 lg:order-none">
             <div className="flex items-start justify-between mb-2">
               <div>
                 <h3 className="font-semibold">{viewSupplier.name}</h3>

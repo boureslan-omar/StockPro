@@ -31,13 +31,18 @@ function SelectOrganizationInner() {
     setError(null);
     try {
       if (orgId !== currentOrgId) {
-        await switchOrganization(orgId);
+        const result = await switchOrganization(orgId);
+        if (!result.ok) {
+          setError(result.message ?? "Failed to select organization");
+          setSwitching(null);
+          return;
+        }
         const supabase = createClient();
         await supabase.auth.refreshSession();
       }
       window.location.href = redirectTo;
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to select organization");
+    } catch {
+      setError("Failed to select organization — please try again.");
       setSwitching(null);
     }
   }

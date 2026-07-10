@@ -44,7 +44,7 @@ export default function AnalysisWidget({
   }
 
   return (
-    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
+    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4">
       <h3 className="font-semibold mb-3">Sales &amp; Purchase Analysis</h3>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
         <div>

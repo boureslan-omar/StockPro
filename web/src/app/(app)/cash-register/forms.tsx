@@ -16,7 +16,7 @@ function submitWithAlert(fn: (fd: FormData) => Promise<void>, onDone?: () => voi
 
 export function OpeningBalanceForms() {
   return (
-    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
+    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4">
       <h3 className="font-semibold mb-3">Set Opening Balance</h3>
       <div className="grid grid-cols-2 gap-3">
         <form action={submitWithAlert(setOpeningBalance)} className="space-y-2">

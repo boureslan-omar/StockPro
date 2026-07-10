@@ -40,7 +40,7 @@ export default function CustomersClient({
         <div />
         <button
           onClick={openAdd}
-          className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 transition"
+          className="rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium px-4 py-2 transition"
         >
           + Add Customer
         </button>
@@ -220,7 +220,7 @@ export default function CustomersClient({
             </button>
             <button
               type="submit"
-              className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2"
+              className="rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium px-4 py-2"
             >
               Save
             </button>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, Suspense } from "react";
-import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { getMyMemberships } from "../(app)/org-actions";
@@ -99,11 +98,10 @@ export default function LoginPage() {
       />
 
       <div className="relative w-full max-w-sm rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-8 shadow-lg">
-        <div className="flex justify-center mb-4">
-          <div className="rounded-xl overflow-hidden shadow-sm">
-            <Image src="/logo.png" alt="StockPro" width={220} height={120} priority className="h-auto w-44 block" />
-          </div>
-        </div>
+        <h1 className="text-3xl font-bold text-center mb-1">
+          <span className="text-[#16233f] dark:text-white">Stock</span>
+          <span className="text-blue-500">Pro</span>
+        </h1>
         <p className="text-sm text-zinc-500 text-center mb-6">
           Warehouse &amp; wholesale management
         </p>

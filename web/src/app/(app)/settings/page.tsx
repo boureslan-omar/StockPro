@@ -13,7 +13,7 @@ export default async function SettingsPage() {
       <h1 className="text-2xl font-bold mb-6">Settings</h1>
 
       <form action={saveSettings} className="space-y-6">
-        <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5">
+        <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-5">
           <h2 className="text-sm font-semibold text-zinc-500 mb-4">STORE INFORMATION</h2>
           <div className="space-y-3">
             <div>
@@ -43,7 +43,7 @@ export default async function SettingsPage() {
           </div>
         </section>
 
-        <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5">
+        <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-5">
           <h2 className="text-sm font-semibold text-zinc-500 mb-4">CURRENCY</h2>
           <div className="space-y-3">
             <div>
@@ -74,7 +74,7 @@ export default async function SettingsPage() {
           </div>
         </section>
 
-        <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5">
+        <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-5">
           <h2 className="text-sm font-semibold text-zinc-500 mb-4">RECEIPTS</h2>
           <label className="flex items-start gap-2 text-sm">
             <input type="checkbox" name="auto_print_receipt" value="1" defaultChecked={s.auto_print_receipt === "1"} className="mt-1" />
@@ -85,7 +85,7 @@ export default async function SettingsPage() {
           </label>
         </section>
 
-        <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5">
+        <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-5">
           <h2 className="text-sm font-semibold text-zinc-500 mb-4">HARDWARE</h2>
           <div className="space-y-3">
             <label className="flex items-start gap-2 text-sm">
@@ -117,12 +117,12 @@ export default async function SettingsPage() {
           </div>
         </section>
 
-        <button type="submit" className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5">
+        <button type="submit" className="rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-medium px-6 py-2.5">
           Save Settings
         </button>
       </form>
 
-      <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 mt-6">
+      <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-5 mt-6">
         <h2 className="text-sm font-semibold text-zinc-500 mb-4">DATA BACKUP</h2>
         <p className="text-sm text-zinc-500 mb-3">
           A snapshot of your data (products, sales, purchases, customers, etc.) is backed up automatically every day, and the last 14 days are

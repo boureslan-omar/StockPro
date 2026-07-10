@@ -63,7 +63,7 @@ export default function TransactionsList({
   }
 
   return (
-    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
+    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold">All Transactions</h3>
         <span className="text-xs px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500">{transactions.length} sales</span>

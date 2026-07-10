@@ -49,19 +49,19 @@ export default async function AuditsPage({
         {audit.note && <p className="text-sm bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 rounded-lg px-3 py-2 mb-4">{audit.note}</p>}
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 text-center">
+          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-3 text-center">
             <p className="text-xs text-zinc-500">Items Counted</p>
             <p className="text-lg font-bold">{rows.length}</p>
           </div>
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 text-center">
+          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-3 text-center">
             <p className="text-xs text-zinc-500">Shortages</p>
             <p className="text-lg font-bold text-red-600">{shortages.length}</p>
           </div>
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 text-center">
+          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-3 text-center">
             <p className="text-xs text-zinc-500">Surpluses</p>
             <p className="text-lg font-bold text-green-600">{surpluses.length}</p>
           </div>
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 text-center">
+          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-3 text-center">
             <p className="text-xs text-zinc-500">Exact Match</p>
             <p className="text-lg font-bold text-zinc-500">{exact.length}</p>
           </div>

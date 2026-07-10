@@ -324,7 +324,7 @@ export default function PosClient({
       </div>
 
       {/* Cart */}
-      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3">
+      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-3">
         <h3 className="font-semibold mb-2">Cart</h3>
         <div className="space-y-2 max-h-[65vh] overflow-y-auto">
           {lineTotals.map(({ l, unitPrice, baseQty, needsMarkup }) => (
@@ -380,7 +380,7 @@ export default function PosClient({
       </div>
 
       {/* Checkout */}
-      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 space-y-3 h-fit">
+      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-3 space-y-3 h-fit">
         <h3 className="font-semibold">Checkout</h3>
         <div>
           <label className="block text-xs font-medium mb-1">Customer</label>
@@ -451,7 +451,7 @@ export default function PosClient({
         <button
           onClick={checkout}
           disabled={submitting || lines.length === 0 || anyNeedsMarkup}
-          className="w-full rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-2.5"
+          className="w-full rounded-lg bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-medium py-2.5"
         >
           {submitting ? "Processing…" : anyNeedsMarkup ? "Enter markup % to continue" : "Finalize Invoice"}
         </button>

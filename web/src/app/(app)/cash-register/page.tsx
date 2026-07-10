@@ -73,12 +73,12 @@ export default async function CashRegisterPage({
           <p className="text-xs text-zinc-500">LBP Drawer</p>
           <p className="text-2xl font-bold text-amber-600">{fmtLBP(balanceLbp)}</p>
         </div>
-        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 text-center">
+        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4 text-center">
           <p className="text-xs text-zinc-500">Period In</p>
           <p className="text-xl font-bold text-green-600">+{fmtUSD(periodInUsd)}</p>
           <p className="text-xs text-zinc-500">+{fmtLBP(periodInLbp)}</p>
         </div>
-        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 text-center">
+        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4 text-center">
           <p className="text-xs text-zinc-500">Period Out</p>
           <p className="text-xl font-bold text-red-600">-{fmtUSD(periodOutUsd)}</p>
           <p className="text-xs text-zinc-500">-{fmtLBP(periodOutLbp)}</p>

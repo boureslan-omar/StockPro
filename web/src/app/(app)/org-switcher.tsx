@@ -27,13 +27,18 @@ export default function OrgSwitcher({ memberships, currentOrgId }: { memberships
     if (orgId === currentOrgId) return;
     setSwitching(true);
     try {
-      await switchOrganization(orgId);
+      const result = await switchOrganization(orgId);
+      if (!result.ok) {
+        alert(result.message ?? "Failed to switch organization");
+        setSwitching(false);
+        return;
+      }
       const supabase = createClient();
       await supabase.auth.refreshSession();
       router.refresh();
       window.location.href = "/";
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to switch organization");
+    } catch {
+      alert("Failed to switch organization — please try again.");
       setSwitching(false);
     }
   }

@@ -63,12 +63,12 @@ export default async function ExpensesPage({
       </form>
 
       <div className="flex flex-wrap gap-3 mb-4">
-        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 min-w-[140px]">
+        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-3 min-w-[140px]">
           <p className="text-xs text-zinc-500">Total Expenses</p>
           <p className="text-lg font-bold text-red-600">{fmtUSD(totalExp)}</p>
         </div>
         {categoryTotals.map(([cat, total]) => (
-          <div key={cat} className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 min-w-[120px]">
+          <div key={cat} className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-3 min-w-[120px]">
             <p className="text-xs text-zinc-500">{cat}</p>
             <p className="font-semibold">{fmtUSD(total)}</p>
           </div>

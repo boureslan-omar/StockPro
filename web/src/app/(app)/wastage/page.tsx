@@ -67,19 +67,19 @@ export default async function WastagePage({
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 text-center">
+        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-3 text-center">
           <p className="text-xs text-zinc-500">This Month Loss</p>
           <p className="text-lg font-bold text-red-600">{fmtUSD(mtdCost)}</p>
         </div>
-        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 text-center">
+        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-3 text-center">
           <p className="text-xs text-zinc-500">Filtered Records</p>
           <p className="text-lg font-bold">{rows.length}</p>
         </div>
-        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 text-center">
+        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-3 text-center">
           <p className="text-xs text-zinc-500">Filtered Loss Value</p>
           <p className="text-lg font-bold text-red-600">{fmtUSD(totalCost)}</p>
         </div>
-        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 text-center">
+        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-3 text-center">
           <p className="text-xs text-zinc-500">Filtered Qty</p>
           <p className="text-lg font-bold">{totalQty.toFixed(2)}</p>
         </div>
@@ -137,7 +137,7 @@ export default async function WastagePage({
         </div>
       )}
 
-      <form method="GET" className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 mb-4 flex flex-wrap gap-3 items-end">
+      <form method="GET" className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-3 mb-4 flex flex-wrap gap-3 items-end">
         <div>
           <label className="block text-xs text-zinc-500 mb-1">Reason</label>
           <select name="reason" defaultValue={reason || "all"} className="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">

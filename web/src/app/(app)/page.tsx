@@ -49,7 +49,7 @@ export default async function DashboardPage() {
         {stats.map((s) => (
           <div
             key={s.label}
-            className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5"
+            className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-5"
           >
             <p className="text-sm text-zinc-500 mb-1">{s.label}</p>
             <p className="text-2xl font-semibold">{s.value}</p>

@@ -64,7 +64,7 @@ export default function SupplierReturnsPanel() {
 
   return (
     <div className="grid lg:grid-cols-2 gap-4">
-      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
+      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4">
         <h3 className="font-semibold mb-3">Find Batch to Return</h3>
         <div className="flex gap-2 mb-3">
           <input
@@ -74,7 +74,7 @@ export default function SupplierReturnsPanel() {
             placeholder="Product name, barcode or purchase reference…"
             className="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
           />
-          <button onClick={search} className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2">
+          <button onClick={search} className="rounded-lg bg-blue-500 hover:bg-blue-500 text-white text-sm px-4 py-2">
             Search
           </button>
         </div>
@@ -141,7 +141,7 @@ export default function SupplierReturnsPanel() {
             </button>
             <button
               onClick={() => setRefundMethod("cash")}
-              className={`flex-1 text-sm px-3 py-1.5 rounded-lg border ${refundMethod === "cash" ? "bg-blue-600 text-white border-blue-600" : "border-zinc-300 dark:border-zinc-700"}`}
+              className={`flex-1 text-sm px-3 py-1.5 rounded-lg border ${refundMethod === "cash" ? "bg-blue-500 text-white border-blue-500" : "border-zinc-300 dark:border-zinc-700"}`}
             >
               Cash Refund
             </button>

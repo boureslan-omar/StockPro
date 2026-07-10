@@ -46,7 +46,7 @@ export default function QuotationsClient({
             setEditing(null);
             setOpen(true);
           }}
-          className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2"
+          className="rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium px-4 py-2"
         >
           + New Quotation
         </button>

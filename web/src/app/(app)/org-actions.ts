@@ -25,12 +25,17 @@ export async function getMyMemberships(): Promise<{ memberships: Membership[]; c
   return { memberships: (memberships ?? []) as unknown as Membership[], currentOrgId };
 }
 
-export async function switchOrganization(targetOrgId: string) {
+// Returns a result object rather than throwing: Next.js redacts thrown Server
+// Action errors in production builds (replaced with a generic "error occurred
+// in the Server Components render" message with no detail), which made real
+// failures here impossible to diagnose from the client. Returning the failure
+// as plain data sidesteps that redaction entirely.
+export async function switchOrganization(targetOrgId: string): Promise<{ ok: boolean; message?: string }> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not signed in.");
+  if (!user) return { ok: false, message: "Not signed in." };
 
   const { data: membership } = await supabase
     .from("org_memberships")
@@ -38,13 +43,20 @@ export async function switchOrganization(targetOrgId: string) {
     .eq("user_id", user.id)
     .eq("organization_id", targetOrgId)
     .single();
-  if (!membership) throw new Error("You are not a member of that organization.");
+  if (!membership) return { ok: false, message: "You are not a member of that organization." };
+
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return {
+      ok: false,
+      message: "Server misconfiguration: SUPABASE_SERVICE_ROLE_KEY is not set in this deployment's environment variables.",
+    };
+  }
 
   const admin = createAdminClient();
   const { error } = await admin.auth.admin.updateUserById(user.id, {
     app_metadata: { organization_id: targetOrgId, role: membership.role },
   });
-  if (error) throw new Error(error.message);
+  if (error) return { ok: false, message: error.message };
 
   await admin.from("profiles").update({ organization_id: targetOrgId, role: membership.role }).eq("id", user.id);
 

@@ -51,7 +51,7 @@ export default async function QuotationsPage({
           <QuotationDetailActions quote={quote} items={rows} storeName={storeName} storeAddress={storeAddress} storePhone={storePhone} />
         </div>
 
-        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 mb-4">
+        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4 mb-4">
           <div className="grid grid-cols-3 gap-4 text-sm mb-4">
             <div>
               <p className="text-zinc-500 text-xs">Customer</p>

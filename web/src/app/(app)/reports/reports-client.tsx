@@ -91,7 +91,7 @@ export default function ReportsClient({
         </button>
       </div>
 
-      <form className="flex flex-wrap items-end gap-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
+      <form className="flex flex-wrap items-end gap-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4">
         <div>
           <label className="block text-xs font-medium mb-1">From</label>
           <input type="date" name="from" defaultValue={from} className="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
@@ -108,7 +108,7 @@ export default function ReportsClient({
             <option value="month">Month</option>
           </select>
         </div>
-        <button type="submit" className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2">
+        <button type="submit" className="rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium px-4 py-2">
           Generate
         </button>
         <div className="w-full flex flex-wrap gap-1.5 pt-1">
@@ -136,7 +136,7 @@ export default function ReportsClient({
           { label: "Net Profit", val: fmtUSD(stats.net), sub: "", cls: "text-green-700 font-extrabold" },
           { label: "Transactions", val: String(stats.txCount), sub: "", cls: "text-zinc-900 dark:text-white" },
         ].map((c) => (
-          <div key={c.label} className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 text-center">
+          <div key={c.label} className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-3 text-center">
             <p className="text-xs text-zinc-500">{c.label}</p>
             <p className={`font-bold ${c.cls}`}>{c.val}</p>
             {c.sub && <p className="text-[10px] text-zinc-400">{c.sub}</p>}
@@ -144,7 +144,7 @@ export default function ReportsClient({
         ))}
       </div>
 
-      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
+      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4">
         <h3 className="font-semibold mb-3">Revenue vs Gross Profit</h3>
         {timeline.length === 0 ? (
           <p className="text-sm text-zinc-500">No data for this period.</p>
@@ -171,7 +171,7 @@ export default function ReportsClient({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
+        <div className="lg:col-span-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4">
           <h3 className="font-semibold mb-3">Top Products by Profit</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -253,7 +253,7 @@ export default function ReportsClient({
             </div>
           )}
 
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
+          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4">
             <h3 className="font-semibold mb-2">Expenses by Category</h3>
             {expByCategory.length === 0 ? (
               <p className="text-sm text-zinc-500">No expenses.</p>
@@ -274,7 +274,7 @@ export default function ReportsClient({
             )}
           </div>
 
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
+          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4">
             <h3 className="font-semibold mb-2">Payment Methods</h3>
             <table className="w-full text-sm">
               <thead className="text-zinc-500 text-left">
@@ -307,7 +307,7 @@ export default function ReportsClient({
 
       <TransactionsList transactions={transactions} storeName={storeName} storeAddress={storeAddress} storePhone={storePhone} />
 
-      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
+      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4">
         <h3 className="font-semibold mb-3">Period Detail</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

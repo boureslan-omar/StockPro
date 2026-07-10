@@ -103,7 +103,7 @@ export default function ProductsClient({
           <span className="text-sm text-zinc-500">
             {products.length} product{products.length === 1 ? "" : "s"}
           </span>
-          <button onClick={openCreate} className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2">
+          <button onClick={openCreate} className="rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium px-4 py-2">
             + Add Product
           </button>
         </div>
@@ -472,7 +472,7 @@ export default function ProductsClient({
             <button type="button" onClick={() => setOpen(false)} className="rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm">
               Cancel
             </button>
-            <button type="submit" className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2">
+            <button type="submit" className="rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium px-4 py-2">
               Save Product
             </button>
           </div>

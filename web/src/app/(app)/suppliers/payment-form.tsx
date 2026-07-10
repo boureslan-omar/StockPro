@@ -38,7 +38,7 @@ export default function PaymentForm({
               type="button"
               onClick={() => setMethod(m)}
               className={`px-2 py-1 rounded ${
-                method === m ? "bg-blue-600 text-white" : "border border-zinc-300 dark:border-zinc-700"
+                method === m ? "bg-blue-500 text-white" : "border border-zinc-300 dark:border-zinc-700"
               }`}
             >
               {m === "cash_usd" ? "Cash USD" : m === "cash_lbp" ? "Cash LBP" : "Bank / Other"}

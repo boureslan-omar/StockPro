@@ -68,7 +68,7 @@ export default function PurchaseForm({ suppliers, categories }: { suppliers: Sup
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2">
+      <button onClick={() => setOpen(true)} className="rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium px-4 py-2">
         + New Purchase
       </button>
 
@@ -242,7 +242,7 @@ export default function PurchaseForm({ suppliers, categories }: { suppliers: Sup
               <button type="button" onClick={() => setOpen(false)} className="rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm">
                 Cancel
               </button>
-              <button type="submit" className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2">
+              <button type="submit" className="rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium px-4 py-2">
                 Save Purchase
               </button>
             </div>
