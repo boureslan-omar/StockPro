@@ -108,7 +108,11 @@ export default function AppShell({
           </button>
         </div>
 
-        <nav className={`flex-1 overflow-y-auto overflow-x-hidden py-4 px-2 ${collapsed ? "space-y-2" : "space-y-5"}`}>
+        <nav
+          className={`flex-1 overflow-y-auto overflow-x-hidden py-4 px-2 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.25)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full ${
+            collapsed ? "space-y-2" : "space-y-5"
+          }`}
+        >
           {NAV_SECTIONS.map((section, i) => (
             <div key={section.label}>
               {i > 0 && collapsed && <div className="mx-2 mb-2 border-t border-white/10" />}
@@ -163,9 +167,9 @@ export default function AppShell({
       {mobileOpen && <div className="fixed inset-0 bg-black/40 z-30 md:hidden" onClick={() => setMobileOpen(false)} />}
 
       {/* Main column */}
-      <div className={`flex-1 flex flex-col min-w-0 transition-[padding] duration-200 ${contentPad}`}>
+      <div className={`flex-1 flex flex-col min-w-0 transition-[padding] duration-200 md:border-l md:border-zinc-200 md:dark:border-zinc-800 ${contentPad}`}>
         <header className="sticky top-0 z-20 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
-          <div className="flex items-center gap-3 px-4 h-16">
+          <div className="flex items-center gap-3 px-4 md:px-6 h-16">
             <button onClick={() => setMobileOpen(true)} className="md:hidden text-zinc-500 hover:text-zinc-900 dark:hover:text-white">
               <Menu className="h-5 w-5" />
             </button>
@@ -179,7 +183,7 @@ export default function AppShell({
             <LogoutButton />
           </div>
         </header>
-        <main className="flex-1 min-w-0 p-4 md:p-6 w-full overflow-x-auto">{children}</main>
+        <main className="flex-1 min-w-0 p-4 md:p-8 w-full overflow-x-auto">{children}</main>
       </div>
     </div>
   );
