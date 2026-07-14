@@ -16,24 +16,17 @@ export default async function CustomersPage({
 
   let query = supabase.from("customers").select("*").order("name");
   if (search) query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%`);
-  const { data: customers } = await query;
 
-  let viewCustomer: { id: number; name: string; phone: string | null; balance: number } | null = null;
-  let ledger: { id: number; type: string; amount: number; note: string | null; created_at: string }[] = [];
+  const [{ data: customers }, viewResult, ledgerResult] = await Promise.all([
+    query,
+    viewId ? supabase.from("customers").select("*").eq("id", viewId).single() : Promise.resolve({ data: null }),
+    viewId
+      ? supabase.from("customer_ledger").select("*").eq("customer_id", viewId).order("created_at", { ascending: false }).limit(100)
+      : Promise.resolve({ data: null }),
+  ]);
 
-  if (viewId) {
-    const { data: c } = await supabase.from("customers").select("*").eq("id", viewId).single();
-    viewCustomer = c;
-    if (c) {
-      const { data: l } = await supabase
-        .from("customer_ledger")
-        .select("*")
-        .eq("customer_id", viewId)
-        .order("created_at", { ascending: false })
-        .limit(100);
-      ledger = l ?? [];
-    }
-  }
+  const viewCustomer = viewResult.data as { id: number; name: string; phone: string | null; balance: number } | null;
+  const ledger = (viewCustomer ? ledgerResult.data : null) ?? [];
 
   const bal = viewCustomer ? Number(viewCustomer.balance) : 0;
 

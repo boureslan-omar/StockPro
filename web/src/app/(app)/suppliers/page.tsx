@@ -20,7 +20,15 @@ export default async function SuppliersPage({
     .select("*, products(count), purchases(count)")
     .order("name");
   if (search) query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%`);
-  const { data: rawSuppliers } = await query;
+
+  const [{ data: rawSuppliers }, viewResult, ledgerResult, settings] = await Promise.all([
+    query,
+    viewId ? supabase.from("suppliers").select("*").eq("id", viewId).single() : Promise.resolve({ data: null }),
+    viewId
+      ? supabase.from("supplier_ledger").select("*").eq("supplier_id", viewId).order("created_at", { ascending: false }).limit(100)
+      : Promise.resolve({ data: null }),
+    getSettings(supabase),
+  ]);
 
   const suppliers = (rawSuppliers ?? []).map((s) => ({
     ...s,
@@ -30,24 +38,9 @@ export default async function SuppliersPage({
 
   const totalOwed = suppliers.reduce((sum, s) => sum + Number(s.balance), 0);
 
-  let viewSupplier: { id: number; name: string; phone: string | null; email: string | null; balance: number } | null = null;
-  let ledger: { id: number; type: string; amount: number; note: string | null; created_at: string }[] = [];
+  const viewSupplier = viewResult.data as { id: number; name: string; phone: string | null; email: string | null; balance: number } | null;
+  const ledger = (viewSupplier ? ledgerResult.data : null) ?? [];
 
-  if (viewId) {
-    const { data: sup } = await supabase.from("suppliers").select("*").eq("id", viewId).single();
-    viewSupplier = sup;
-    if (sup) {
-      const { data: l } = await supabase
-        .from("supplier_ledger")
-        .select("*")
-        .eq("supplier_id", viewId)
-        .order("created_at", { ascending: false })
-        .limit(100);
-      ledger = l ?? [];
-    }
-  }
-
-  const settings = await getSettings(supabase);
   const rate = Number(settings.exchange_rate || 89750);
   const bal = viewSupplier ? Number(viewSupplier.balance) : 0;
 

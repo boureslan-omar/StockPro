@@ -17,15 +17,14 @@ export default async function AppLayout({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, role")
-    .eq("id", user.id)
-    .single();
-
-  // License gate: JWT app_metadata carries the current org. No row (stale
-  // pre-tenant session) or a non-active license both block access.
-  const org = await getCurrentOrg(supabase);
+  // Profile and org are independent of each other — fetch in parallel, and
+  // hand the already-resolved `user` to getCurrentOrg so it doesn't make its
+  // own redundant auth.getUser() network call (this layout runs on every
+  // navigation, so each avoided round-trip matters).
+  const [{ data: profile }, org] = await Promise.all([
+    supabase.from("profiles").select("full_name, role").eq("id", user.id).single(),
+    getCurrentOrg(supabase, user),
+  ]);
 
   if (!org || org.license_status !== "active") {
     return (
@@ -46,7 +45,7 @@ export default async function AppLayout({
   }
 
   const [{ memberships, currentOrgId }, { count: memberCount }, cookieStore] = await Promise.all([
-    getMyMemberships(),
+    getMyMemberships(user),
     supabase.from("org_memberships").select("id", { count: "exact", head: true }).eq("organization_id", org.id),
     cookies(),
   ]);

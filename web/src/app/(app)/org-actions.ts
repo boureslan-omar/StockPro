@@ -1,5 +1,6 @@
 "use server";
 
+import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -9,11 +10,15 @@ export type Membership = {
   organizations: { id: string; name: string; slug: string; license_status: string } | null;
 };
 
-export async function getMyMemberships(): Promise<{ memberships: Membership[]; currentOrgId: string | null }> {
+// Accepts an already-resolved `user` so callers that just did their own
+// getUser() (e.g. the app layout, on every navigation) don't pay for a
+// second redundant Auth round-trip — each call to auth.getUser() is a real
+// network request, and this runs on every single page load.
+export async function getMyMemberships(
+  knownUser?: User | null
+): Promise<{ memberships: Membership[]; currentOrgId: string | null }> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = knownUser ?? (await supabase.auth.getUser()).data.user;
   if (!user) return { memberships: [], currentOrgId: null };
 
   const { data: memberships } = await supabase
