@@ -29,7 +29,15 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <NextTopLoader color="#3b82f6" height={3} showSpinner={false} shadow="0 0 8px #3b82f6, 0 0 4px #3b82f6" />
+        <NextTopLoader
+          color="#3b82f6"
+          height={3}
+          showSpinner={false}
+          shadow="0 0 8px #3b82f6, 0 0 4px #3b82f6"
+          initialPosition={0.08}
+          crawlSpeed={400}
+          speed={400}
+        />
         {children}
       </body>
     </html>
