@@ -70,11 +70,17 @@ export function CardGridSkeleton({ tiles = 6 }: { tiles?: number }) {
 }
 
 // List + slide-out detail split — Customers, Suppliers.
-export function ListWithDetailSkeleton() {
+// showHeader is false when the page streams its own title/search form in
+// separately and only the list/detail grid is behind this boundary.
+export function ListWithDetailSkeleton({ showHeader = true }: { showHeader?: boolean } = {}) {
   return (
     <div className="animate-pulse">
-      <Bar className="h-7 w-40 mb-4" />
-      <Bar className="h-9 w-64 mb-4" />
+      {showHeader && (
+        <>
+          <Bar className="h-7 w-40 mb-4" />
+          <Bar className="h-9 w-64 mb-4" />
+        </>
+      )}
       <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
         {Array.from({ length: 8 }).map((_, r) => (
           <div key={r} className="flex items-center gap-6 px-4 py-3.5 border-b border-zinc-100 dark:border-zinc-800/60 last:border-0">

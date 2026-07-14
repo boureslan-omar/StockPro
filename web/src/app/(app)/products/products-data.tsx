@@ -20,10 +20,12 @@ export default async function ProductsData() {
   }
 
   return (
-    <ProductsClient
-      products={(products ?? []) as unknown as Product[]}
-      categories={categories ?? []}
-      suppliers={suppliers ?? []}
-    />
+    <div className="stream-in">
+      <ProductsClient
+        products={(products ?? []) as unknown as Product[]}
+        categories={categories ?? []}
+        suppliers={suppliers ?? []}
+      />
+    </div>
   );
 }

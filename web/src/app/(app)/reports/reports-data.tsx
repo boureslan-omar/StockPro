@@ -152,23 +152,25 @@ export default async function ReportsData({
   const settings = await getSettings(supabase);
 
   return (
-    <ReportsClient
-      from={from}
-      to={to}
-      groupBy={groupBy}
-      stats={stats}
-      topProducts={topProducts}
-      bulkPurchases={bulkPurchases}
-      byMethod={byMethod}
-      expByCategory={expByCategory}
-      timeline={timeline}
-      transactions={rows}
-      categories={categories ?? []}
-      suppliers={suppliers ?? []}
-      exchangeRate={Number(settings.exchange_rate || 89750)}
-      storeName={settings.store_name || "StockPro"}
-      storeAddress={settings.store_address || ""}
-      storePhone={settings.store_phone || ""}
-    />
+    <div className="stream-in">
+      <ReportsClient
+        from={from}
+        to={to}
+        groupBy={groupBy}
+        stats={stats}
+        topProducts={topProducts}
+        bulkPurchases={bulkPurchases}
+        byMethod={byMethod}
+        expByCategory={expByCategory}
+        timeline={timeline}
+        transactions={rows}
+        categories={categories ?? []}
+        suppliers={suppliers ?? []}
+        exchangeRate={Number(settings.exchange_rate || 89750)}
+        storeName={settings.store_name || "StockPro"}
+        storeAddress={settings.store_address || ""}
+        storePhone={settings.store_phone || ""}
+      />
+    </div>
   );
 }
