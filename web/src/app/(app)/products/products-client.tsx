@@ -97,16 +97,13 @@ export default function ProductsClient({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Products</h1>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-zinc-500">
-            {products.length} product{products.length === 1 ? "" : "s"}
-          </span>
-          <button onClick={openCreate} className="rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium px-4 py-2">
-            + Add Product
-          </button>
-        </div>
+      <div className="flex items-center justify-end gap-3 mb-6">
+        <span className="text-sm text-zinc-500">
+          {products.length} product{products.length === 1 ? "" : "s"}
+        </span>
+        <button onClick={openCreate} className="rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium px-4 py-2">
+          + Add Product
+        </button>
       </div>
 
       {products.length === 0 ? (

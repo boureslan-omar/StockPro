@@ -14,13 +14,25 @@ function Card({ className = "", children }: { className?: string; children?: Rea
 
 // Toolbar + table shape — matches the majority of module list pages
 // (Products, Purchases, Purchase Orders, Quotations, Expenses, Audits, Wastage, Returns…).
-export function ListSkeleton({ columns = 6, rows = 7 }: { columns?: number; rows?: number }) {
+export function ListSkeleton({
+  columns = 6,
+  rows = 7,
+  showHeader = true,
+}: {
+  columns?: number;
+  rows?: number;
+  // False when a page streams its title in separately and only this
+  // component's table/toolbar portion is behind the Suspense boundary.
+  showHeader?: boolean;
+}) {
   return (
     <div className="animate-pulse">
-      <div className="flex items-center justify-between mb-4">
-        <Bar className="h-7 w-40" />
-        <Bar className="h-9 w-28" />
-      </div>
+      {showHeader && (
+        <div className="flex items-center justify-between mb-4">
+          <Bar className="h-7 w-40" />
+          <Bar className="h-9 w-28" />
+        </div>
+      )}
       <Bar className="h-9 w-64 mb-4" />
       <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
         <div className="flex gap-6 px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60">

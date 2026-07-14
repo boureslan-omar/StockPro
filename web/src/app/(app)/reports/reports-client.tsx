@@ -84,8 +84,7 @@ export default function ReportsClient({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Reports</h1>
+      <div className="flex items-center justify-end">
         <button onClick={() => window.print()} className="rounded-lg border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 text-sm">
           Print
         </button>
