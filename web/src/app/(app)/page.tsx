@@ -1,10 +1,19 @@
 import Link from "next/link";
-import { Package, AlertTriangle, ShoppingCart, DollarSign, Users, Coins } from "lucide-react";
+import { Package, AlertTriangle, ShoppingCart, DollarSign, Users, Coins, Truck, FileText, Wallet, TrendingUp, CheckCircle2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { fmtUSD } from "@/lib/format";
+import { getCashBalance } from "@/lib/cash";
+import { fmtUSD, fmtLBP } from "@/lib/format";
 import RevenueTrendChart from "./dashboard-chart";
 
 const TREND_DAYS = 14;
+const TOP_PRODUCTS_DAYS = 30;
+
+const QUICK_ACTIONS = [
+  { href: "/pos", label: "New Sale", icon: ShoppingCart, tone: "bg-blue-500" },
+  { href: "/purchases", label: "New Purchase", icon: Truck, tone: "bg-green-500" },
+  { href: "/quotations", label: "New Quotation", icon: FileText, tone: "bg-violet-500" },
+  { href: "/products", label: "Add Product", icon: Package, tone: "bg-amber-500" },
+];
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -16,7 +25,11 @@ export default async function DashboardPage() {
   trendStart.setDate(trendStart.getDate() - (TREND_DAYS - 1));
   trendStart.setHours(0, 0, 0, 0);
 
-  const [products, customers, todaySales, settings, trendSales, recentSales] = await Promise.all([
+  const topProductsStart = new Date();
+  topProductsStart.setDate(topProductsStart.getDate() - (TOP_PRODUCTS_DAYS - 1));
+  topProductsStart.setHours(0, 0, 0, 0);
+
+  const [products, customers, todaySales, settings, trendSales, recentSales, topProductRows, cashBalance] = await Promise.all([
     supabase.from("products").select("id, name, stock, low_stock_alert, unit"),
     supabase.from("customers").select("id", { count: "exact", head: true }),
     supabase
@@ -36,6 +49,12 @@ export default async function DashboardPage() {
       .eq("is_void", false)
       .order("sale_date", { ascending: false })
       .limit(8),
+    supabase
+      .from("sale_items")
+      .select("product_name, total, sales!inner(sale_date, is_void)")
+      .eq("sales.is_void", false)
+      .gte("sales.sale_date", topProductsStart.toISOString()),
+    getCashBalance(supabase),
   ]);
 
   const settingsMap = Object.fromEntries((settings.data ?? []).map((s) => [s.key, s.value]));
@@ -60,6 +79,16 @@ export default async function DashboardPage() {
   const trendTotal = trend.reduce((s, t) => s + t.total, 0);
 
   const recent = recentSales.data ?? [];
+
+  const productAgg = new Map<string, number>();
+  for (const r of topProductRows.data ?? []) {
+    productAgg.set(r.product_name, (productAgg.get(r.product_name) ?? 0) + Number(r.total));
+  }
+  const topProducts = [...productAgg.entries()]
+    .map(([name, total]) => ({ name, total }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5);
+  const topProductsMax = Math.max(1, ...topProducts.map((p) => p.total));
 
   const stats = [
     { label: "Products", value: String(allProducts.length), icon: Package, tone: "text-blue-500" },
@@ -123,17 +152,93 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {lowStockProducts.length > 0 && (
-        <div className="rounded-xl border border-red-200 dark:border-red-900 bg-white dark:bg-zinc-900 shadow-sm p-5 mt-4">
+      <div className="grid lg:grid-cols-3 gap-4 mt-4">
+        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-5">
+          <h2 className="font-semibold mb-3">Quick Actions</h2>
+          <div className="grid grid-cols-2 gap-2">
+            {QUICK_ACTIONS.map((a) => (
+              <Link
+                key={a.href}
+                href={a.href}
+                className="flex flex-col items-center justify-center gap-2 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:border-blue-500 hover:shadow-md transition p-3 text-center"
+              >
+                <span className={`inline-flex h-9 w-9 items-center justify-center rounded-lg text-white ${a.tone}`}>
+                  <a.icon className="h-5 w-5" />
+                </span>
+                <span className="text-xs font-medium">{a.label}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-5">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-red-500" />
-              Low Stock
+              <TrendingUp className="h-4 w-4 text-blue-500" />
+              Top Products
             </h2>
-            <Link href="/products" className="text-xs text-blue-600 hover:underline">
-              Manage products →
-            </Link>
+            <span className="text-xs text-zinc-500">Last {TOP_PRODUCTS_DAYS}d</span>
           </div>
+          {topProducts.length === 0 ? (
+            <p className="text-sm text-zinc-500 py-6 text-center">No sales in this period.</p>
+          ) : (
+            <div className="space-y-2.5">
+              {topProducts.map((p) => (
+                <div key={p.name}>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="truncate">{p.name}</span>
+                    <span className="font-medium shrink-0 ml-2">{fmtUSD(p.total)}</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                    <div className="h-full rounded-full bg-blue-500" style={{ width: `${Math.max(4, (p.total / topProductsMax) * 100)}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-5">
+          <h2 className="font-semibold flex items-center gap-2 mb-3">
+            <Wallet className="h-4 w-4 text-green-500" />
+            Cash Register
+          </h2>
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            <div className="rounded-lg bg-zinc-50 dark:bg-zinc-800/60 px-3 py-2.5 text-center">
+              <p className="text-xs text-zinc-500">USD Drawer</p>
+              <p className="font-semibold text-green-600">{fmtUSD(cashBalance.usd)}</p>
+            </div>
+            <div className="rounded-lg bg-zinc-50 dark:bg-zinc-800/60 px-3 py-2.5 text-center">
+              <p className="text-xs text-zinc-500">LBP Drawer</p>
+              <p className="font-semibold text-amber-600">{fmtLBP(cashBalance.lbp)}</p>
+            </div>
+          </div>
+          <Link href="/cash-register" className="block text-xs text-blue-600 hover:underline text-center">
+            Open Cash Register →
+          </Link>
+        </div>
+      </div>
+
+      <div
+        className={`rounded-xl border shadow-sm p-5 mt-4 bg-white dark:bg-zinc-900 ${
+          lowStockProducts.length > 0 ? "border-red-200 dark:border-red-900" : "border-zinc-200 dark:border-zinc-800"
+        }`}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-semibold flex items-center gap-2">
+            <AlertTriangle className={`h-4 w-4 ${lowStockProducts.length > 0 ? "text-red-500" : "text-zinc-400"}`} />
+            Low Stock
+          </h2>
+          <Link href="/products" className="text-xs text-blue-600 hover:underline">
+            Manage products →
+          </Link>
+        </div>
+        {lowStockProducts.length === 0 ? (
+          <p className="text-sm text-zinc-500 py-6 text-center flex items-center justify-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-green-500" />
+            All products are above their low-stock threshold.
+          </p>
+        ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
             {lowStockProducts.map((p) => (
               <div key={p.id} className="flex items-center justify-between rounded-lg bg-zinc-50 dark:bg-zinc-800/60 px-3 py-2 text-sm">
@@ -144,8 +249,8 @@ export default async function DashboardPage() {
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
