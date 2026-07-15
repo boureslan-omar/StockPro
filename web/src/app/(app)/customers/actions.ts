@@ -47,6 +47,16 @@ export async function deleteCustomer(id: number) {
   redirect("/customers");
 }
 
+export async function getCustomerStatementData(customerId: number) {
+  const supabase = await createClient();
+  const [{ data: customer }, { data: ledger }, settings] = await Promise.all([
+    supabase.from("customers").select("*").eq("id", customerId).single(),
+    supabase.from("customer_ledger").select("*").eq("customer_id", customerId).order("created_at", { ascending: true }),
+    getSettings(supabase),
+  ]);
+  return { customer, ledger: ledger ?? [], settings };
+}
+
 export async function recordCustomerPayment(formData: FormData) {
   const supabase = await createClient();
   const customerId = Number(formData.get("customer_id"));
