@@ -10,7 +10,7 @@ export default async function SettingsPage({
   const { gdrive_connected, gdrive_error } = await searchParams;
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-2xl mx-auto">
       <h1 className="text-2xl font-bold mb-6">Settings</h1>
       {gdrive_connected && (
         <p className="text-sm bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-300 rounded-lg px-3 py-2 mb-4">
