@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Package } from "lucide-react";
+import { Package, ShoppingCart, Receipt } from "lucide-react";
 import { processSale, getReceiptData, getCustomerPrices, type CartLine } from "./actions";
 import { printReceiptWindow } from "./receipt";
 import { linkQuotationToSale } from "../quotations/actions";
@@ -445,7 +445,14 @@ export default function PosClient({
   return (
     <div className="grid lg:grid-cols-[1fr_360px_320px] gap-4">
       {/* Product grid */}
-      <div>
+      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-3">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold flex items-center gap-2">
+            <Package className="h-5 w-5 text-blue-500" />
+            Products
+          </h3>
+          <span className="text-xs text-zinc-500">{filtered.length} shown</span>
+        </div>
         <div className="flex gap-2 mb-3">
           <input
             value={search}
@@ -466,7 +473,7 @@ export default function PosClient({
             ))}
           </select>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[70vh] overflow-y-auto pr-1">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[65vh] overflow-y-auto pr-1">
           {filtered.map((p) => {
             const low = Number(p.stock) <= 0 && p.product_type === "regular";
             return (
@@ -499,8 +506,14 @@ export default function PosClient({
 
       {/* Cart */}
       <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-3">
-        <h3 className="font-semibold mb-2">Cart</h3>
-        <div className="space-y-2 max-h-[65vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-semibold flex items-center gap-2">
+            <ShoppingCart className="h-5 w-5 text-blue-500" />
+            Cart
+          </h3>
+          {lines.length > 0 && <span className="text-xs text-zinc-500">{lines.length} item{lines.length === 1 ? "" : "s"}</span>}
+        </div>
+        <div className="space-y-2 max-h-[62vh] overflow-y-auto">
           {lineTotals.map(({ l, unitPrice, baseQty, needsMarkup }) => {
             const remembered = customerPrices[l.productId];
             const rememberedDisplay = remembered != null ? (l.sellAs === "box" ? remembered * l.unitsPerBox : remembered) : null;
@@ -574,7 +587,10 @@ export default function PosClient({
 
       {/* Checkout */}
       <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-3 space-y-3 h-fit">
-        <h3 className="font-semibold">Checkout</h3>
+        <h3 className="font-semibold flex items-center gap-2">
+          <Receipt className="h-5 w-5 text-blue-500" />
+          Checkout
+        </h3>
         <div>
           <label className="block text-xs font-medium mb-1">Customer</label>
           <CustomerCombobox customers={customers} customerId={customerId} onSelect={setCustomerId} />
