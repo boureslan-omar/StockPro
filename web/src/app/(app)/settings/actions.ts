@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentOrg } from "@/lib/org";
 import { saveSetting } from "@/lib/settings";
 import { runOrgBackup, getLatestBackup } from "@/lib/backup";
+import { getGoogleDriveConnection, disconnectGoogleDrive as disconnectGoogleDriveLib } from "@/lib/google-drive";
 
 const TEXT_FIELDS = ["store_name", "store_address", "store_phone", "exchange_rate", "base_currency"];
 
@@ -31,7 +32,7 @@ export async function runBackupNow() {
   const admin = createAdminClient();
   const result = await runOrgBackup(admin, org.id, org.slug);
   revalidatePath("/settings");
-  return { message: `Backup created — ${result.rowCount} rows saved.` };
+  return { message: `Backup created — ${result.rowCount} rows saved.${result.driveUploaded ? " Also copied to Google Drive." : ""}` };
 }
 
 export async function getBackupInfo() {
@@ -41,4 +42,23 @@ export async function getBackupInfo() {
 
   const admin = createAdminClient();
   return getLatestBackup(admin, org.slug);
+}
+
+export async function getGoogleDriveStatus() {
+  const supabase = await createClient();
+  const org = await getCurrentOrg(supabase);
+  if (!org) return null;
+
+  const admin = createAdminClient();
+  return getGoogleDriveConnection(admin, org.id);
+}
+
+export async function disconnectGoogleDrive() {
+  const supabase = await createClient();
+  const org = await getCurrentOrg(supabase);
+  if (!org) throw new Error("Organization not found.");
+
+  const admin = createAdminClient();
+  await disconnectGoogleDriveLib(admin, org.id);
+  revalidatePath("/settings");
 }

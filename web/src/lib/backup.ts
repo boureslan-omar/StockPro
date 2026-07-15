@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { uploadBackupToDrive } from "./google-drive";
 
 // Every org-scoped business table, plus settings (keyed by organization_id + key
 // instead of a bare id, but still just an organization_id filter away).
@@ -32,15 +33,27 @@ export async function runOrgBackup(admin: SupabaseClient, orgId: string, orgSlug
 
   const dateStr = new Date().toISOString().slice(0, 10);
   const path = `${orgSlug}/${dateStr}.json`;
+  const manifestJson = JSON.stringify(manifest);
   const { error: uploadErr } = await admin.storage
     .from(BUCKET)
-    .upload(path, JSON.stringify(manifest), { contentType: "application/json", upsert: true });
+    .upload(path, manifestJson, { contentType: "application/json", upsert: true });
   if (uploadErr) throw new Error(`Backup upload failed: ${uploadErr.message}`);
 
   await pruneOldBackups(admin, orgSlug);
 
+  // Best-effort: Supabase Storage above is the backup of record. A connected
+  // Google Drive is an extra copy for the operator — its failure shouldn't
+  // fail the backup that already succeeded.
+  let driveUploaded = false;
+  try {
+    const result = await uploadBackupToDrive(admin, orgId, `${dateStr}.json`, manifestJson);
+    driveUploaded = result.uploaded;
+  } catch (e) {
+    console.error(`Google Drive backup upload failed for org ${orgSlug}:`, e);
+  }
+
   const rowCount = Object.values(tables).reduce((s, rows) => s + rows.length, 0);
-  return { path, rowCount };
+  return { path, rowCount, driveUploaded };
 }
 
 async function pruneOldBackups(admin: SupabaseClient, orgSlug: string) {

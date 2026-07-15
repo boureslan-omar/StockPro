@@ -1,11 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { getSettings } from "@/lib/settings";
-import { saveSettings, getBackupInfo } from "./actions";
+import { saveSettings, getBackupInfo, getGoogleDriveStatus } from "./actions";
 import BackupButton from "./backup-button";
+import DisconnectGoogleDriveButton from "./disconnect-gdrive-button";
 
 export default async function SettingsData() {
   const supabase = await createClient();
-  const [s, backup] = await Promise.all([getSettings(supabase), getBackupInfo()]);
+  const [s, backup, gdrive] = await Promise.all([getSettings(supabase), getBackupInfo(), getGoogleDriveStatus()]);
 
   return (
     <div className="stream-in">
@@ -135,6 +136,31 @@ export default async function SettingsData() {
             <span className="text-sm text-zinc-500">No backup yet.</span>
           )}
         </div>
+      </section>
+
+      <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-5 mt-6">
+        <h2 className="text-sm font-semibold text-zinc-500 mb-4">GOOGLE DRIVE BACKUP</h2>
+        {gdrive ? (
+          <div className="flex items-center justify-between">
+            <p className="text-sm">
+              Connected as <span className="font-medium">{gdrive.connected_email}</span>
+              <span className="text-zinc-500"> — every backup is also copied to a &quot;StockPro Backups&quot; folder in this Drive.</span>
+            </p>
+            <DisconnectGoogleDriveButton />
+          </div>
+        ) : (
+          <>
+            <p className="text-sm text-zinc-500 mb-3">
+              Connect a Google account so every backup is also copied to that account&apos;s Google Drive, in addition to the built-in storage above.
+            </p>
+            <a
+              href="/api/google-drive/connect"
+              className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800"
+            >
+              Connect Google Drive
+            </a>
+          </>
+        )}
       </section>
     </div>
   );
