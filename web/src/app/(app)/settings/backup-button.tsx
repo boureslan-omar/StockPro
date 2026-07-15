@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Loader2 } from "lucide-react";
 import { runBackupNow } from "./actions";
 
 export default function BackupButton() {
@@ -22,8 +23,9 @@ export default function BackupButton() {
           setRunning(false);
         }
       }}
-      className="rounded-lg bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white text-sm font-medium px-4 py-2"
+      className="inline-flex items-center gap-2 rounded-lg bg-blue-500 hover:bg-blue-600 disabled:opacity-70 text-white text-sm font-medium px-4 py-2"
     >
+      {running && <Loader2 className="h-4 w-4 animate-spin" />}
       {running ? "Backing up…" : "Back Up Now"}
     </button>
   );
