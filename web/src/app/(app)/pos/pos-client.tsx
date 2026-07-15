@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Package } from "lucide-react";
-import { processSale, getReceiptData, type CartLine } from "./actions";
+import { processSale, getReceiptData, getCustomerPrices, type CartLine } from "./actions";
 import { printReceiptWindow } from "./receipt";
 import { linkQuotationToSale } from "../quotations/actions";
 
@@ -21,7 +21,7 @@ type Product = {
   category_id: number | null;
 };
 
-type Customer = { id: number; name: string; balance: number };
+type Customer = { id: number; name: string; phone: string | null; balance: number };
 type Category = { id: number; name: string };
 
 type Line = {
@@ -39,6 +39,11 @@ type Line = {
   qty: string;
   costMode: boolean;
   markupPercent: string;
+  // "" = use catalog (or customer-memory) pricing; non-empty = a manual
+  // override the operator typed, in whatever unit sellAs currently is
+  // (per-box or per-unit). Saved back as this customer's new remembered
+  // price on checkout, same as any other price actually charged.
+  priceOverride: string;
 };
 
 let nextKey = 1;
@@ -72,7 +77,95 @@ function buildLinesFromInitial(initialLines?: InitialLine[]): Line[] {
     qty: String(it.qty),
     costMode: false,
     markupPercent: "",
+    priceOverride: "",
   }));
+}
+
+// Fuzzy-filters the already-loaded customer list client-side by name or
+// phone — fine even for thousands of rows since it's just a substring scan,
+// no server round-trip needed.
+function CustomerCombobox({
+  customers,
+  customerId,
+  onSelect,
+}: {
+  customers: Customer[];
+  customerId: string;
+  onSelect: (id: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const selected = customers.find((c) => String(c.id) === customerId);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
+  }, []);
+
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? customers.filter((c) => c.name.toLowerCase().includes(q) || (c.phone || "").includes(q)).slice(0, 50)
+    : customers.slice(0, 50);
+
+  return (
+    <div className="relative" ref={boxRef}>
+      <input
+        value={open ? query : selected?.name ?? ""}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => {
+          setQuery("");
+          setOpen(true);
+        }}
+        placeholder="Walk-in — search name or phone…"
+        className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm"
+      />
+      {open && (
+        <div className="absolute z-50 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-lg">
+          <button
+            type="button"
+            onClick={() => {
+              onSelect("");
+              setQuery("");
+              setOpen(false);
+            }}
+            className="w-full text-left px-3 py-2 text-sm text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+          >
+            Walk-in (no customer)
+          </button>
+          {filtered.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => {
+                onSelect(String(c.id));
+                setQuery("");
+                setOpen(false);
+              }}
+              className="w-full flex items-center justify-between gap-2 px-3 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            >
+              <span>
+                <span className="font-medium">{c.name}</span>
+                {c.phone && <span className="text-zinc-500 ml-2 text-xs">{c.phone}</span>}
+              </span>
+              {Number(c.balance) !== 0 && (
+                <span className={`text-xs shrink-0 ${Number(c.balance) > 0 ? "text-green-600" : "text-red-600"}`}>
+                  {Number(c.balance) > 0 ? "credit" : "debt"} ${Math.abs(Number(c.balance)).toFixed(2)}
+                </span>
+              )}
+            </button>
+          ))}
+          {filtered.length === 0 && <p className="px-3 py-2 text-sm text-zinc-500">No matches.</p>}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function PosClient({
@@ -100,6 +193,8 @@ export default function PosClient({
   const [categoryFilter, setCategoryFilter] = useState("");
   const [lines, setLines] = useState<Line[]>(() => buildLinesFromInitial(initialLines));
   const [customerId, setCustomerId] = useState("");
+  const [customerPrices, setCustomerPrices] = useState<Record<number, number>>({});
+  const [paymentTerms, setPaymentTerms] = useState<"cash" | "bank_transfer" | "account">("cash");
   const [discount, setDiscount] = useState("0");
   const [creditUse, setCreditUse] = useState("0");
   const [debtPayment, setDebtPayment] = useState("0");
@@ -118,12 +213,47 @@ export default function PosClient({
     return p.name.toLowerCase().includes(q) || p.barcode === search.trim();
   });
 
+  // Customer-specific pricing memory: load this customer's last-paid prices
+  // whenever they're selected, then apply them onto any cart line that
+  // doesn't already have a manual override (added below and in addProduct).
+  useEffect(() => {
+    if (!customerId) {
+      setCustomerPrices({});
+      return;
+    }
+    let cancelled = false;
+    getCustomerPrices(Number(customerId)).then((map) => {
+      if (!cancelled) setCustomerPrices(map);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [customerId]);
+
+  useEffect(() => {
+    if (!Object.keys(customerPrices).length) return;
+    setLines((prev) =>
+      prev.map((l) => {
+        if (l.priceOverride !== "" || l.costMode) return l;
+        const remembered = customerPrices[l.productId];
+        if (remembered == null) return l;
+        const display = l.sellAs === "box" ? remembered * l.unitsPerBox : remembered;
+        return { ...l, priceOverride: display.toFixed(4).replace(/\.?0+$/, "") };
+      })
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerPrices]);
+
   function addProduct(p: Product) {
     setLines((prev) => {
       const existing = prev.find((l) => l.productId === p.id && !l.costMode);
       if (existing) {
         return prev.map((l) => (l.key === existing.key ? { ...l, qty: String((parseFloat(l.qty) || 0) + 1) } : l));
       }
+      const sellAs: "unit" | "box" = p.unit === "box" && (p.units_per_box || 1) > 1 ? "box" : "unit";
+      const remembered = customerPrices[p.id];
+      const priceOverride =
+        remembered != null ? String(sellAs === "box" ? remembered * (p.units_per_box || 1) : remembered) : "";
       return [
         ...prev,
         {
@@ -140,10 +270,11 @@ export default function PosClient({
           // Box-registered products are always transacted in whole boxes —
           // this isn't a per-sale choice, it's fixed by how the product is
           // registered (see products-client.tsx's own unit field).
-          sellAs: p.unit === "box" && (p.units_per_box || 1) > 1 ? "box" : "unit",
+          sellAs,
           qty: "1",
           costMode: false,
           markupPercent: "",
+          priceOverride,
         },
       ];
     });
@@ -169,9 +300,22 @@ export default function PosClient({
 
     if (l.type === "bulk") {
       // Bulk: qty field holds the flat charge, sellUnit doubles as a fixed amount
-      const needsMarkup = l.sellUnit <= 0 && !l.markupPercent;
-      const price = l.sellUnit > 0 ? l.sellUnit : l.costPrice * (1 + (parseFloat(l.markupPercent) || 0) / 100);
+      const needsMarkup = l.sellUnit <= 0 && !l.markupPercent && l.priceOverride === "";
+      const price =
+        l.priceOverride !== ""
+          ? parseFloat(l.priceOverride) || 0
+          : l.sellUnit > 0
+          ? l.sellUnit
+          : l.costPrice * (1 + (parseFloat(l.markupPercent) || 0) / 100);
       return { unitPrice: price, baseQty: qtyEntered, needsMarkup };
+    }
+
+    // A manual price (typed directly, or auto-filled from this customer's
+    // price memory) takes priority over catalog pricing entirely.
+    if (l.priceOverride !== "") {
+      const overrideVal = parseFloat(l.priceOverride) || 0;
+      const unitPrice = l.sellAs === "box" ? overrideVal / l.unitsPerBox : overrideVal;
+      return { unitPrice, baseQty, needsMarkup: false };
     }
 
     if (l.sellAs === "box" && l.sellBox) {
@@ -192,8 +336,10 @@ export default function PosClient({
   const subtotal = lineTotals.reduce((s, lt) => s + lt.unitPrice * lt.baseQty, 0);
   const anyNeedsMarkup = lineTotals.some((lt) => lt.needsMarkup);
   const total = Math.max(0, subtotal - (parseFloat(discount) || 0) - (parseFloat(creditUse) || 0));
-  const totalGiven = (parseFloat(paidUsd) || 0) + (parseFloat(paidLbp) || 0) / exchangeRate;
+  const totalGiven = paymentTerms === "account" ? 0 : (parseFloat(paidUsd) || 0) + (parseFloat(paidLbp) || 0) / exchangeRate;
   const changeAmt = Math.max(0, totalGiven - total - (parseFloat(debtPayment) || 0));
+  // Unpaid portion of THIS invoice — becomes debt on the customer's account.
+  const remainingBalance = Math.max(0, total - totalGiven);
 
   const selectedCustomer = customers.find((c) => String(c.id) === customerId);
 
@@ -204,6 +350,14 @@ export default function PosClient({
     }
     if (anyNeedsMarkup) {
       alert("Some items have no selling price. Enter a markup % for them before checkout.");
+      return;
+    }
+    if (paymentTerms === "account" && !customerId) {
+      alert("Select a customer before selling on account.");
+      return;
+    }
+    if (paymentTerms !== "account" && remainingBalance > 0.001 && !customerId) {
+      alert("This sale isn't fully paid. Select a customer to record the remaining balance as debt, or collect full payment.");
       return;
     }
     setSubmitting(true);
@@ -219,9 +373,9 @@ export default function PosClient({
     fd.append("cart_json", JSON.stringify(cart));
     fd.append("discount", discount || "0");
     fd.append("credit_use", creditUse || "0");
-    fd.append("paid_usd", paidUsd || "0");
-    fd.append("paid_lbp", paidLbp || "0");
-    fd.append("payment_method", "cash");
+    fd.append("paid_usd", paymentTerms === "account" ? "0" : paidUsd || "0");
+    fd.append("paid_lbp", paymentTerms === "account" ? "0" : paidLbp || "0");
+    fd.append("payment_method", paymentTerms);
     fd.append("note", note);
     if (customerId) fd.append("customer_id", customerId);
     fd.append("debt_payment", debtPayment || "0");
@@ -234,6 +388,7 @@ export default function PosClient({
       setLastReceipt(result.receipt);
       setLines([]);
       setCustomerId("");
+      setPaymentTerms("cash");
       setDiscount("0");
       setCreditUse("0");
       setDebtPayment("0");
@@ -246,6 +401,21 @@ export default function PosClient({
       setSubmitting(false);
     }
   }
+
+  // Ctrl+Enter finalizes the sale without reaching for the mouse. (F12 was
+  // requested, but Chrome/Edge reserve it for DevTools and won't let a page
+  // override it — Ctrl+Enter is the reliable equivalent.)
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.ctrlKey && e.key === "Enter" && !submitting && lines.length > 0 && !anyNeedsMarkup) {
+        e.preventDefault();
+        checkout();
+      }
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submitting, lines, anyNeedsMarkup, paymentTerms, paidUsd, paidLbp, customerId]);
 
   async function print() {
     if (!lastSaleId) return;
@@ -331,51 +501,73 @@ export default function PosClient({
       <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-3">
         <h3 className="font-semibold mb-2">Cart</h3>
         <div className="space-y-2 max-h-[65vh] overflow-y-auto">
-          {lineTotals.map(({ l, unitPrice, baseQty, needsMarkup }) => (
-            <div key={l.key} className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-2 text-sm">
-              <div className="flex justify-between items-start">
-                <span className="font-medium">{l.name}</span>
-                <button onClick={() => removeLine(l.key)} className="text-red-600 text-xs">
-                  ✕
-                </button>
-              </div>
-              <div className="flex items-center gap-2 mt-1">
-                <input
-                  type="number"
-                  min={l.sellAs === "box" ? "1" : "0.001"}
-                  step={l.sellAs === "box" ? "1" : "0.001"}
-                  value={l.qty}
-                  onChange={(e) => updateLine(l.key, { qty: e.target.value })}
-                  className="w-20 rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 text-xs"
-                />
-                {l.sellAs === "box" ? (
-                  <span className="rounded bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 px-1.5 py-1 text-xs font-medium">
-                    boxes ({l.unitsPerBox}/box)
-                  </span>
-                ) : (
-                  <span className="text-xs text-zinc-500">{l.unit}</span>
+          {lineTotals.map(({ l, unitPrice, baseQty, needsMarkup }) => {
+            const remembered = customerPrices[l.productId];
+            const rememberedDisplay = remembered != null ? (l.sellAs === "box" ? remembered * l.unitsPerBox : remembered) : null;
+            return (
+              <div key={l.key} className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-2 text-sm">
+                <div className="flex justify-between items-start">
+                  <span className="font-medium">{l.name}</span>
+                  <button onClick={() => removeLine(l.key)} className="text-red-600 text-xs">
+                    ✕
+                  </button>
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <input
+                    type="number"
+                    min={l.sellAs === "box" ? "1" : "0.001"}
+                    step={l.sellAs === "box" ? "1" : "0.001"}
+                    value={l.qty}
+                    onChange={(e) => updateLine(l.key, { qty: e.target.value })}
+                    className="w-16 rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 text-xs"
+                  />
+                  {l.sellAs === "box" ? (
+                    <span className="rounded bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 px-1.5 py-1 text-xs font-medium">
+                      boxes ({l.unitsPerBox}/box)
+                    </span>
+                  ) : (
+                    <span className="text-xs text-zinc-500">{l.unit}</span>
+                  )}
+                  <label className="flex items-center gap-1 text-xs text-zinc-500 ml-auto">
+                    <input type="checkbox" checked={l.costMode} onChange={(e) => updateLine(l.key, { costMode: e.target.checked })} />
+                    Cost+markup
+                  </label>
+                </div>
+                {!l.costMode && l.type !== "bulk" && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.0001"
+                      placeholder={l.sellAs === "box" ? "Price/box" : "Price/unit"}
+                      value={l.priceOverride}
+                      onChange={(e) => updateLine(l.key, { priceOverride: e.target.value })}
+                      className="w-28 rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 text-xs"
+                    />
+                    {rememberedDisplay != null && (
+                      <span className="text-xs text-amber-600 dark:text-amber-400" title="This customer's last price for this item">
+                        last paid ${rememberedDisplay.toFixed(2)}
+                      </span>
+                    )}
+                  </div>
                 )}
-                <label className="flex items-center gap-1 text-xs text-zinc-500 ml-auto">
-                  <input type="checkbox" checked={l.costMode} onChange={(e) => updateLine(l.key, { costMode: e.target.checked })} />
-                  Cost+markup
-                </label>
+                {(needsMarkup || l.costMode) && (
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    placeholder="Markup %"
+                    value={l.markupPercent}
+                    onChange={(e) => updateLine(l.key, { markupPercent: e.target.value })}
+                    className={`w-full mt-1 rounded border px-2 py-1 text-xs ${needsMarkup ? "border-red-400" : "border-zinc-300 dark:border-zinc-700"}`}
+                  />
+                )}
+                <p className="text-right text-xs mt-1">
+                  {baseQty} {l.unit} × ${unitPrice.toFixed(4)} = <strong>${(baseQty * unitPrice).toFixed(2)}</strong>
+                </p>
               </div>
-              {(needsMarkup || l.costMode) && (
-                <input
-                  type="number"
-                  min="0"
-                  step="0.1"
-                  placeholder="Markup %"
-                  value={l.markupPercent}
-                  onChange={(e) => updateLine(l.key, { markupPercent: e.target.value })}
-                  className={`w-full mt-1 rounded border px-2 py-1 text-xs ${needsMarkup ? "border-red-400" : "border-zinc-300 dark:border-zinc-700"}`}
-                />
-              )}
-              <p className="text-right text-xs mt-1">
-                {baseQty} {l.unit} × ${unitPrice.toFixed(4)} = <strong>${(baseQty * unitPrice).toFixed(2)}</strong>
-              </p>
-            </div>
-          ))}
+            );
+          })}
           {lines.length === 0 && <p className="text-center text-zinc-500 text-sm py-8">Cart is empty.</p>}
         </div>
       </div>
@@ -385,14 +577,7 @@ export default function PosClient({
         <h3 className="font-semibold">Checkout</h3>
         <div>
           <label className="block text-xs font-medium mb-1">Customer</label>
-          <select value={customerId} onChange={(e) => setCustomerId(e.target.value)} className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm">
-            <option value="">Walk-in</option>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name} {Number(c.balance) !== 0 ? `(${Number(c.balance) > 0 ? "credit" : "debt"} $${Math.abs(Number(c.balance)).toFixed(2)})` : ""}
-              </option>
-            ))}
-          </select>
+          <CustomerCombobox customers={customers} customerId={customerId} onSelect={setCustomerId} />
         </div>
 
         {selectedCustomer && Number(selectedCustomer.balance) < 0 && (
@@ -413,39 +598,84 @@ export default function PosClient({
           <input type="number" min="0" step="0.01" value={discount} onChange={(e) => setDiscount(e.target.value)} className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm" />
         </div>
 
-        <div className="border-t border-zinc-200 dark:border-zinc-800 pt-2 text-sm space-y-1">
-          <div className="flex justify-between">
-            <span className="text-zinc-500">Subtotal</span>
-            <span>${subtotal.toFixed(2)}</span>
+        {/* Warehouse settlement panel */}
+        <div className="border-t border-zinc-200 dark:border-zinc-800 pt-3 space-y-3">
+          <div className="rounded-lg bg-zinc-50 dark:bg-zinc-800/60 p-3 space-y-1">
+            <div className="flex justify-between text-sm">
+              <span className="text-zinc-500">Subtotal</span>
+              <span>${subtotal.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between font-bold text-lg">
+              <span>Total Invoice</span>
+              <span>${total.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-xs text-zinc-500">
+              <span>at {exchangeRate.toLocaleString()} LBP/$</span>
+              <span>{Math.round(total * exchangeRate).toLocaleString()} LBP</span>
+            </div>
           </div>
-          <div className="flex justify-between font-bold text-lg">
-            <span>Total</span>
-            <span>${total.toFixed(2)}</span>
-          </div>
-        </div>
 
-        <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="block text-xs font-medium mb-1">Paid USD</label>
-            <input type="number" min="0" step="0.01" value={paidUsd} onChange={(e) => setPaidUsd(e.target.value)} className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm" />
+            <label className="block text-xs font-medium mb-1">Terms of Payment</label>
+            <select
+              value={paymentTerms}
+              onChange={(e) => setPaymentTerms(e.target.value as typeof paymentTerms)}
+              className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm"
+            >
+              <option value="cash">Immediate Cash</option>
+              <option value="bank_transfer">Bank Transfer</option>
+              <option value="account">On Account (Debt)</option>
+            </select>
           </div>
-          <div>
-            <label className="block text-xs font-medium mb-1">Paid LBP</label>
-            <input type="number" min="0" step="1000" value={paidLbp} onChange={(e) => setPaidLbp(e.target.value)} className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm" />
-          </div>
+
+          {paymentTerms !== "account" && (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-medium mb-1">Paid USD</label>
+                  <input type="number" min="0" step="0.01" value={paidUsd} onChange={(e) => setPaidUsd(e.target.value)} className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">Paid LBP</label>
+                  <input type="number" min="0" step="1000" value={paidLbp} onChange={(e) => setPaidLbp(e.target.value)} className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm" />
+                </div>
+              </div>
+              {changeAmt > 0.001 && (
+                <div>
+                  <label className="block text-xs font-medium mb-1">Change in</label>
+                  <select value={changeCurrency} onChange={(e) => setChangeCurrency(e.target.value as "USD" | "LBP")} className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm">
+                    <option value="LBP">LBP</option>
+                    <option value="USD">USD</option>
+                  </select>
+                </div>
+              )}
+            </>
+          )}
+
+          {paymentTerms === "account" ? (
+            <p className="text-sm bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 rounded-lg px-3 py-2">
+              Full ${total.toFixed(2)} will be added to {selectedCustomer ? selectedCustomer.name + "'s" : "the customer's"} account as debt.
+            </p>
+          ) : remainingBalance > 0.001 ? (
+            <p className="text-sm bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 rounded-lg px-3 py-2">
+              {selectedCustomer ? (
+                <>
+                  Remaining balance <strong>${remainingBalance.toFixed(2)}</strong> will be added to {selectedCustomer.name}&apos;s account as debt.
+                </>
+              ) : (
+                <>
+                  Remaining balance <strong>${remainingBalance.toFixed(2)}</strong> — select a customer to record this as debt, or collect full payment.
+                </>
+              )}
+            </p>
+          ) : changeAmt > 0.001 ? (
+            <p className="text-sm bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-300 rounded-lg px-3 py-2">
+              Change due: {changeCurrency === "USD" ? `$${changeAmt.toFixed(2)}` : `${Math.round(changeAmt * exchangeRate).toLocaleString()} LBP`}
+            </p>
+          ) : (
+            <p className="text-sm bg-zinc-50 dark:bg-zinc-800/60 text-zinc-500 rounded-lg px-3 py-2">Fully settled.</p>
+          )}
         </div>
-        <div>
-          <label className="block text-xs font-medium mb-1">Change in</label>
-          <select value={changeCurrency} onChange={(e) => setChangeCurrency(e.target.value as "USD" | "LBP")} className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm">
-            <option value="LBP">LBP</option>
-            <option value="USD">USD</option>
-          </select>
-        </div>
-        {changeAmt > 0 && (
-          <p className="text-sm bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-300 rounded-lg px-3 py-2">
-            Change due: {changeCurrency === "USD" ? `$${changeAmt.toFixed(2)}` : `${Math.round(changeAmt * exchangeRate).toLocaleString()} LBP`}
-          </p>
-        )}
 
         <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (optional)" className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm" />
 
@@ -456,6 +686,7 @@ export default function PosClient({
         >
           {submitting ? "Processing…" : anyNeedsMarkup ? "Enter markup % to continue" : "Finalize Invoice"}
         </button>
+        <p className="text-center text-[11px] text-zinc-400">Ctrl+Enter to finalize</p>
       </div>
     </div>
   );

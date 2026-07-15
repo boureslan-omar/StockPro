@@ -286,7 +286,7 @@ export default function ReportsClient({
               <tbody>
                 {byMethod.map((m) => (
                   <tr key={m.method} className="border-t border-zinc-100 dark:border-zinc-800">
-                    <td className="py-1.5 capitalize">{m.method}</td>
+                    <td className="py-1.5 capitalize">{m.method.replace("_", " ")}</td>
                     <td className="py-1.5 text-right">{m.count}</td>
                     <td className="py-1.5 text-right">{fmtUSD(m.total)}</td>
                   </tr>

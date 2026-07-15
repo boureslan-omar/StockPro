@@ -35,6 +35,7 @@ const METHOD_STYLE: Record<string, string> = {
   card: "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300",
   mobile: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/50 dark:text-cyan-300",
   account: "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300",
+  bank_transfer: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300",
 };
 
 export default function TransactionsList({
@@ -100,7 +101,7 @@ export default function TransactionsList({
                   </td>
                   <td className="px-3 py-2">
                     <span className={`text-xs px-1.5 py-0.5 rounded capitalize ${METHOD_STYLE[tx.payment_method] ?? "bg-zinc-100 dark:bg-zinc-800"}`}>
-                      {tx.payment_method}
+                      {tx.payment_method.replace("_", " ")}
                     </span>
                   </td>
                   <td className="px-3 py-2 text-right font-semibold">{fmtUSD(tx.total)}</td>

@@ -203,6 +203,17 @@ export async function processSale(formData: FormData) {
   return { saleId, receipt };
 }
 
+// "Memory mode": the last price actually charged to this customer for each
+// product (customer_prices is upserted at the end of processSale below).
+export async function getCustomerPrices(customerId: number): Promise<Record<number, number>> {
+  if (!customerId) return {};
+  const supabase = await createClient();
+  const { data } = await supabase.from("customer_prices").select("product_id, last_price").eq("customer_id", customerId);
+  const map: Record<number, number> = {};
+  for (const row of data ?? []) map[row.product_id] = Number(row.last_price);
+  return map;
+}
+
 export async function getReceiptData(saleId: number) {
   const supabase = await createClient();
   const { data: sale } = await supabase.from("sales").select("*, customers(name)").eq("id", saleId).single();

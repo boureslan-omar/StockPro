@@ -10,7 +10,7 @@ export default async function PosData({ fromQuotation }: { fromQuotation?: strin
       .from("products")
       .select("id, name, barcode, unit, stock, cost_price, sell_price, sell_price_box, units_per_box, product_type, product_source, category_id")
       .order("name"),
-    supabase.from("customers").select("id, name, balance").order("name"),
+    supabase.from("customers").select("id, name, phone, balance").order("name"),
     supabase.from("categories").select("id, name").order("name"),
   ]);
 
