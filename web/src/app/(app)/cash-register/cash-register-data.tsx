@@ -17,16 +17,16 @@ const TYPE_BADGE: Record<string, string> = {
 
 export default async function CashRegisterData({ from, to }: { from: string; to: string }) {
   const dateFilter = (
-    <form method="GET" className="flex gap-3 items-end mb-3">
-      <div>
+    <form method="GET" className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-3 mb-3 flex flex-wrap gap-3 items-end">
+      <div className="flex-1 min-w-[160px]">
         <label className="block text-xs text-zinc-500 mb-1">From</label>
-        <input type="date" name="from" defaultValue={from} className="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+        <input type="date" name="from" defaultValue={from} className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
       </div>
-      <div>
+      <div className="flex-1 min-w-[160px]">
         <label className="block text-xs text-zinc-500 mb-1">To</label>
-        <input type="date" name="to" defaultValue={to} className="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+        <input type="date" name="to" defaultValue={to} className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
       </div>
-      <button className="rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm">Filter</button>
+      <button className="shrink-0 rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm">Filter</button>
     </form>
   );
 

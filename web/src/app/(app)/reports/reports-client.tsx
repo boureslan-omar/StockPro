@@ -91,23 +91,23 @@ export default function ReportsClient({
       </div>
 
       <form className="flex flex-wrap items-end gap-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-4">
-        <div>
+        <div className="flex-1 min-w-[160px]">
           <label className="block text-xs font-medium mb-1">From</label>
-          <input type="date" name="from" defaultValue={from} className="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+          <input type="date" name="from" defaultValue={from} className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
         </div>
-        <div>
+        <div className="flex-1 min-w-[160px]">
           <label className="block text-xs font-medium mb-1">To</label>
-          <input type="date" name="to" defaultValue={to} className="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+          <input type="date" name="to" defaultValue={to} className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
         </div>
-        <div>
+        <div className="flex-1 min-w-[160px]">
           <label className="block text-xs font-medium mb-1">Group by</label>
-          <select name="group" defaultValue={groupBy} className="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+          <select name="group" defaultValue={groupBy} className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
             <option value="day">Day</option>
             <option value="week">Week</option>
             <option value="month">Month</option>
           </select>
         </div>
-        <button type="submit" className="rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium px-4 py-2">
+        <button type="submit" className="shrink-0 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium px-4 py-2">
           Generate
         </button>
         <div className="w-full flex flex-wrap gap-1.5 pt-1">
