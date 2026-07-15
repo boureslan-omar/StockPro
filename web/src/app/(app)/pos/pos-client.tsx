@@ -68,7 +68,7 @@ function buildLinesFromInitial(initialLines?: InitialLine[]): Line[] {
     costPrice: it.costPrice,
     sellUnit: it.sellUnit,
     sellBox: null,
-    sellAs: "unit",
+    sellAs: it.unit === "box" && it.unitsPerBox > 1 ? "box" : "unit",
     qty: String(it.qty),
     costMode: false,
     markupPercent: "",
@@ -137,7 +137,10 @@ export default function PosClient({
           costPrice: Number(p.cost_price),
           sellUnit: Number(p.sell_price),
           sellBox: p.sell_price_box ? Number(p.sell_price_box) : null,
-          sellAs: "unit",
+          // Box-registered products are always transacted in whole boxes —
+          // this isn't a per-sale choice, it's fixed by how the product is
+          // registered (see products-client.tsx's own unit field).
+          sellAs: p.unit === "box" && (p.units_per_box || 1) > 1 ? "box" : "unit",
           qty: "1",
           costMode: false,
           markupPercent: "",
@@ -339,21 +342,18 @@ export default function PosClient({
               <div className="flex items-center gap-2 mt-1">
                 <input
                   type="number"
-                  min="0.001"
-                  step="0.001"
+                  min={l.sellAs === "box" ? "1" : "0.001"}
+                  step={l.sellAs === "box" ? "1" : "0.001"}
                   value={l.qty}
                   onChange={(e) => updateLine(l.key, { qty: e.target.value })}
                   className="w-20 rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 text-xs"
                 />
-                {l.unitsPerBox > 1 && l.type !== "bulk" && !l.costMode && (
-                  <select
-                    value={l.sellAs}
-                    onChange={(e) => updateLine(l.key, { sellAs: e.target.value as "unit" | "box" })}
-                    className="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-1 py-1 text-xs"
-                  >
-                    <option value="unit">unit</option>
-                    <option value="box">box ({l.unitsPerBox}/box)</option>
-                  </select>
+                {l.sellAs === "box" ? (
+                  <span className="rounded bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 px-1.5 py-1 text-xs font-medium">
+                    boxes ({l.unitsPerBox}/box)
+                  </span>
+                ) : (
+                  <span className="text-xs text-zinc-500">{l.unit}</span>
                 )}
                 <label className="flex items-center gap-1 text-xs text-zinc-500 ml-auto">
                   <input type="checkbox" checked={l.costMode} onChange={(e) => updateLine(l.key, { costMode: e.target.checked })} />

@@ -10,6 +10,7 @@ type POItemInput = {
   productName: string;
   quantity: number;
   unit: string;
+  newProductUnitsPerBox?: number;
   estimatedPrice: number;
   note: string;
   newProductSource: "regular" | "consignment";
@@ -55,11 +56,60 @@ export async function createPO(formData: FormData) {
       estimated_price: item.estimatedPrice || 0,
       note: item.note || "",
       new_product_source: !item.productId ? item.newProductSource : "regular",
+      new_product_upb: !item.productId && item.unit === "box" ? Math.max(1, item.newProductUnitsPerBox || 1) : null,
     });
   }
 
   revalidatePath("/purchase-orders");
   return { message: `Purchase Order ${poNumber} created.` };
+}
+
+// Items are fully replaced (delete + reinsert) rather than diffed — safe
+// because nothing stock/batch-affecting has happened yet at this stage;
+// that only occurs at receivePO. Blocked once a PO is received/cancelled,
+// since its items are then tied to real purchase_items/batches/stock.
+export async function updatePO(formData: FormData) {
+  const supabase = await createClient();
+  const poId = Number(formData.get("po_id"));
+  const supplierId = Number(formData.get("supplier_id"));
+  const deliveryDate = String(formData.get("delivery_date") || "") || null;
+  const note = String(formData.get("note") || "").trim();
+  const items: POItemInput[] = JSON.parse(String(formData.get("items_json") || "[]"));
+
+  if (!supplierId || items.length === 0) {
+    throw new Error("Please select a supplier and add at least one item.");
+  }
+
+  const { data: po } = await supabase.from("purchase_orders").select("status").eq("id", poId).single();
+  if (!po) throw new Error("Purchase order not found.");
+  if (po.status === "received" || po.status === "cancelled") {
+    throw new Error(`This PO is already ${po.status} and can no longer be edited.`);
+  }
+
+  const { error } = await supabase
+    .from("purchase_orders")
+    .update({ supplier_id: supplierId, delivery_date: deliveryDate, note })
+    .eq("id", poId);
+  if (error) throw new Error(error.message);
+
+  await supabase.from("purchase_order_items").delete().eq("po_id", poId);
+  for (const item of items) {
+    if (!item.productName.trim()) continue;
+    await supabase.from("purchase_order_items").insert({
+      po_id: poId,
+      product_id: item.productId,
+      product_name: item.productName.trim(),
+      quantity: item.quantity || 1,
+      unit: item.unit || "pcs",
+      estimated_price: item.estimatedPrice || 0,
+      note: item.note || "",
+      new_product_source: !item.productId ? item.newProductSource : "regular",
+      new_product_upb: !item.productId && item.unit === "box" ? Math.max(1, item.newProductUnitsPerBox || 1) : null,
+    });
+  }
+
+  revalidatePath("/purchase-orders");
+  return { message: "Purchase Order updated." };
 }
 
 export async function updatePOStatus(poId: number, status: string) {
@@ -82,10 +132,19 @@ export async function getPOItems(poId: number) {
 
   const enriched = await Promise.all(
     (items ?? []).map(async (it) => {
-      if (!it.product_id) return { ...it, current_cost: 0, sell_price: 0, track_expiry: false, product_source: "owned" };
+      if (!it.product_id) {
+        return {
+          ...it,
+          current_cost: 0,
+          sell_price: 0,
+          track_expiry: false,
+          product_source: "owned",
+          units_per_box: it.unit === "box" ? it.new_product_upb || 1 : 1,
+        };
+      }
       const { data: prod } = await supabase
         .from("products")
-        .select("cost_price, sell_price, track_expiry, product_source")
+        .select("cost_price, sell_price, track_expiry, product_source, unit, units_per_box")
         .eq("id", it.product_id)
         .single();
       return {
@@ -94,6 +153,7 @@ export async function getPOItems(poId: number) {
         sell_price: prod?.sell_price ?? 0,
         track_expiry: prod?.track_expiry ?? false,
         product_source: prod?.product_source ?? "owned",
+        units_per_box: prod?.unit === "box" ? prod?.units_per_box ?? 1 : 1,
       };
     })
   );
@@ -105,6 +165,7 @@ type ReceiveItemInput = {
   productName: string;
   quantity: number;
   unit: string;
+  newProductUnitsPerBox?: number;
   cost: number;
   sell: number;
   newProductSource: "regular" | "consignment";
@@ -215,6 +276,7 @@ export async function receivePO(formData: FormData) {
         .insert({
           name: it.productName,
           unit: it.unit || "pcs",
+          units_per_box: it.unit === "box" ? Math.max(1, it.newProductUnitsPerBox || 1) : 1,
           cost_price: it.cost,
           sell_price: it.sell || 0,
           stock: it.quantity,

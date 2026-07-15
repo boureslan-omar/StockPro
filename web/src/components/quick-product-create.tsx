@@ -13,6 +13,7 @@ export type QuickProduct = {
   unit: string | null;
   cost_price: number;
   sell_price: number;
+  units_per_box: number;
   stock: number;
   track_expiry: boolean;
   product_type: string;
@@ -33,6 +34,7 @@ export default function QuickProductCreate({
   const [supplierList, setSupplierList] = useState(suppliers);
   const [categoryList, setCategoryList] = useState(categories);
   const [trackExpiry, setTrackExpiry] = useState(false);
+  const [unit, setUnit] = useState("pcs");
 
   return (
     <>
@@ -76,7 +78,12 @@ export default function QuickProductCreate({
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Unit</label>
-              <select name="unit" className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+              <select
+                name="unit"
+                value={unit}
+                onChange={(e) => setUnit(e.target.value)}
+                className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
+              >
                 {["pcs", "box", "kg", "g", "L", "mL"].map((u) => (
                   <option key={u} value={u}>
                     {u}
@@ -85,6 +92,21 @@ export default function QuickProductCreate({
               </select>
             </div>
           </div>
+
+          {unit === "box" && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Units per Box</label>
+              <input
+                name="units_per_box"
+                type="number"
+                min="1"
+                step="1"
+                defaultValue="1"
+                className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
+              />
+              <p className="text-xs text-zinc-500 mt-1">Buying and selling this product will be done in whole boxes.</p>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>

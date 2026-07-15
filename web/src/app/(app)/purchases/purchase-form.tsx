@@ -40,6 +40,16 @@ export default function PurchaseForm({ suppliers, categories }: { suppliers: Sup
     setRows((prev) => prev.filter((r) => r.key !== key));
   }
 
+  // Box-registered products (unit === "box") are always bought in whole boxes —
+  // the entered quantity/cost are per-box and get converted to base units/cost
+  // per unit here, since batches/stock/reports all track base units.
+  function isBoxMode(r: Row) {
+    return r.product?.unit === "box" && (r.product.units_per_box ?? 1) > 1;
+  }
+  function unitsPerBox(r: Row) {
+    return r.product?.units_per_box ?? 1;
+  }
+
   function lineTotal(r: Row) {
     return (parseFloat(r.quantity) || 0) * (parseFloat(r.unitCost) || 0);
   }
@@ -50,14 +60,20 @@ export default function PurchaseForm({ suppliers, categories }: { suppliers: Sup
   const itemsJson = JSON.stringify(
     rows
       .filter((r) => r.product && (parseFloat(r.unitCost) || 0) > 0)
-      .map((r) => ({
-        productId: r.product!.id,
-        itemType: r.itemType,
-        quantity: parseFloat(r.quantity) || 0,
-        unitCost: parseFloat(r.unitCost) || 0,
-        newSellPrice: parseFloat(r.newSellPrice) || 0,
-        expiryDate: r.expiryDate || null,
-      }))
+      .map((r) => {
+        const box = isBoxMode(r);
+        const upb = unitsPerBox(r);
+        const enteredQty = parseFloat(r.quantity) || 0;
+        const enteredCost = parseFloat(r.unitCost) || 0;
+        return {
+          productId: r.product!.id,
+          itemType: r.itemType,
+          quantity: box ? enteredQty * upb : enteredQty,
+          unitCost: box ? enteredCost / upb : enteredCost,
+          newSellPrice: parseFloat(r.newSellPrice) || 0,
+          expiryDate: r.expiryDate || null,
+        };
+      })
   );
 
   function resetForm() {
@@ -131,6 +147,7 @@ export default function PurchaseForm({ suppliers, categories }: { suppliers: Sup
           <div className="space-y-2">
             {rows.map((r) => {
               const needsExpiry = r.product?.track_expiry;
+              const box = isBoxMode(r);
               return (
                 <div key={r.key} className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3 grid grid-cols-12 gap-2 items-start">
                   <div className="col-span-4">
@@ -144,7 +161,12 @@ export default function PurchaseForm({ suppliers, categories }: { suppliers: Sup
                         onCreated={(p) => updateRow(r.key, { product: p, unitCost: String(p.cost_price || "") })}
                       />
                     </div>
-                    {r.product && <p className="text-xs text-green-600 mt-1">{r.product.name}</p>}
+                    {r.product && (
+                      <p className="text-xs text-green-600 mt-1">
+                        {r.product.name}
+                        {box && ` (box of ${unitsPerBox(r)})`}
+                      </p>
+                    )}
                   </div>
                   <div className="col-span-2">
                     <select
@@ -157,21 +179,24 @@ export default function PurchaseForm({ suppliers, categories }: { suppliers: Sup
                     </select>
                   </div>
                   <div className="col-span-1">
+                    {box && <label className="block text-[10px] text-zinc-500 mb-0.5">Boxes</label>}
                     <input
                       type="number"
                       min="0"
-                      step="0.001"
+                      step={box ? "1" : "0.001"}
+                      placeholder={box ? "Boxes" : "Qty"}
                       value={r.quantity}
                       onChange={(e) => updateRow(r.key, { quantity: e.target.value })}
                       className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-2 text-sm"
                     />
                   </div>
                   <div className="col-span-2">
+                    {box && <label className="block text-[10px] text-zinc-500 mb-0.5">Cost/box</label>}
                     <input
                       type="number"
                       min="0"
                       step="0.0001"
-                      placeholder="Cost"
+                      placeholder={box ? "Cost/box" : "Cost"}
                       value={r.unitCost}
                       onChange={(e) => updateRow(r.key, { unitCost: e.target.value })}
                       className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-2 text-sm"

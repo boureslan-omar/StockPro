@@ -10,6 +10,7 @@ export type PickedProduct = {
   stock: number;
   cost_price: number;
   sell_price: number;
+  units_per_box: number;
   product_type: string;
   product_source: string;
   track_expiry: boolean;

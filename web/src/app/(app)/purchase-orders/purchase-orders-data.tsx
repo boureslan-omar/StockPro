@@ -2,6 +2,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import POForm from "./po-form";
 import ReceivePO from "./receive-po";
+import ViewPO from "./view-po";
+import EditPO from "./edit-po";
 import StatusSelect from "./status-select";
 import ConfirmDeleteButton from "@/components/confirm-delete-button";
 import { deletePO } from "./actions";
@@ -56,6 +58,17 @@ export default async function PurchaseOrdersData({ status }: { status: string })
                   </td>
                   <td className="px-4 py-2.5 text-xs text-zinc-500">{new Date(po.created_at).toLocaleDateString()}</td>
                   <td className="px-4 py-2.5 whitespace-nowrap">
+                    <ViewPO poId={po.id} label={po.po_number} />
+                    {po.status !== "received" && po.status !== "cancelled" && (
+                      <EditPO
+                        poId={po.id}
+                        poNumber={po.po_number}
+                        suppliers={suppliers ?? []}
+                        supplierId={po.supplier_id}
+                        deliveryDate={po.delivery_date}
+                        note={po.note}
+                      />
+                    )}
                     {po.status !== "received" && po.status !== "cancelled" && <ReceivePO poId={po.id} poNumber={po.po_number} />}
                     {po.status === "received" && po.received_purchase_id && (
                       <Link href="/purchases" className="text-green-600 hover:underline text-xs mr-2">

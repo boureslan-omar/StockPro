@@ -9,6 +9,7 @@ type POItem = {
   product_name: string;
   quantity: number;
   unit: string;
+  units_per_box: number;
   estimated_price: number;
   current_cost: number;
   sell_price: number;
@@ -20,6 +21,7 @@ type ReceiveRow = {
   productId: number | null;
   productName: string;
   unit: string;
+  unitsPerBox: number;
   quantity: string;
   cost: string;
   sell: string;
@@ -45,6 +47,7 @@ export default function ReceivePO({ poId, poNumber }: { poId: number; poNumber: 
       productId: it.product_id,
       productName: it.product_name,
       unit: it.unit,
+      unitsPerBox: it.units_per_box || 1,
       quantity: String(it.quantity),
       cost: String(it.estimated_price > 0 ? it.estimated_price : it.current_cost || 0),
       sell: it.sell_price ? String(it.sell_price) : "",
@@ -61,6 +64,13 @@ export default function ReceivePO({ poId, poNumber }: { poId: number; poNumber: 
 
   function updateRow(i: number, patch: Partial<ReceiveRow>) {
     setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  }
+
+  // Box-mode rows show/collect quantity in boxes and cost per box — both get
+  // converted to base units/cost-per-unit before hitting the server, since
+  // stock, batches, and reports all track base units.
+  function isBoxMode(r: ReceiveRow) {
+    return r.unit === "box" && r.unitsPerBox > 1;
   }
 
   const grandTotal = rows.reduce((s, r) => s + (parseFloat(r.quantity) || 0) * (parseFloat(r.cost) || 0), 0);
@@ -93,17 +103,23 @@ export default function ReceivePO({ poId, poNumber }: { poId: number; poNumber: 
               name="items_json"
               readOnly
               value={JSON.stringify(
-                rows.map((r) => ({
-                  productId: r.productId,
-                  productName: r.productName,
-                  quantity: parseFloat(r.quantity) || 0,
-                  unit: r.unit,
-                  cost: parseFloat(r.cost) || 0,
-                  sell: parseFloat(r.sell) || 0,
-                  newProductSource: r.newProductSource,
-                  trackExpiry: r.trackExpiry,
-                  expiryDate: r.expiryDate || null,
-                }))
+                rows.map((r) => {
+                  const box = isBoxMode(r);
+                  const enteredQty = parseFloat(r.quantity) || 0;
+                  const enteredCost = parseFloat(r.cost) || 0;
+                  return {
+                    productId: r.productId,
+                    productName: r.productName,
+                    quantity: box ? enteredQty * r.unitsPerBox : enteredQty,
+                    unit: r.unit,
+                    newProductUnitsPerBox: !r.productId && r.unit === "box" ? Math.max(1, Math.round(r.unitsPerBox || 1)) : 1,
+                    cost: box ? enteredCost / r.unitsPerBox : enteredCost,
+                    sell: parseFloat(r.sell) || 0,
+                    newProductSource: r.newProductSource,
+                    trackExpiry: r.trackExpiry,
+                    expiryDate: r.expiryDate || null,
+                  };
+                })
               )}
             />
 
@@ -112,10 +128,14 @@ export default function ReceivePO({ poId, poNumber }: { poId: number; poNumber: 
             <div className="space-y-2">
               {rows.map((r, i) => {
                 const needsExpiry = r.productId ? r.existingTrackExpiry : r.trackExpiry;
+                const box = isBoxMode(r);
                 return (
                   <div key={i} className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3 grid grid-cols-12 gap-2 items-start">
                     <div className="col-span-4">
-                      <p className="text-sm font-medium">{r.productName}</p>
+                      <p className="text-sm font-medium">
+                        {r.productName}
+                        {box && ` (box of ${r.unitsPerBox})`}
+                      </p>
                       <p className="text-xs text-zinc-500">{r.unit}</p>
                       {!r.productId && (
                         <label className="flex items-center gap-1.5 text-xs mt-1">
@@ -123,20 +143,33 @@ export default function ReceivePO({ poId, poNumber }: { poId: number; poNumber: 
                           Track Expiry
                         </label>
                       )}
+                      {!r.productId && r.unit === "box" && (
+                        <div className="mt-1">
+                          <label className="block text-[10px] text-zinc-500 mb-0.5">Units per box</label>
+                          <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={r.unitsPerBox}
+                            onChange={(e) => updateRow(i, { unitsPerBox: Number(e.target.value) || 1 })}
+                            className="w-20 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 text-xs"
+                          />
+                        </div>
+                      )}
                     </div>
                     <div className="col-span-2">
-                      <label className="block text-xs text-zinc-500 mb-0.5">Qty received</label>
+                      <label className="block text-xs text-zinc-500 mb-0.5">{box ? "Boxes received" : "Qty received"}</label>
                       <input
                         type="number"
                         min="0"
-                        step="0.001"
+                        step={box ? "1" : "0.001"}
                         value={r.quantity}
                         onChange={(e) => updateRow(i, { quantity: e.target.value })}
                         className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm"
                       />
                     </div>
                     <div className="col-span-2">
-                      <label className="block text-xs text-zinc-500 mb-0.5">Cost/unit</label>
+                      <label className="block text-xs text-zinc-500 mb-0.5">{box ? "Cost/box" : "Cost/unit"}</label>
                       <input
                         type="number"
                         min="0"

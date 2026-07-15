@@ -41,6 +41,7 @@ export async function createProductQuick(formData: FormData) {
   const sellPrice = Number(formData.get("sell_price") || 0);
   const lowStockAlert = Number(formData.get("low_stock_alert") || 5);
   const trackExpiry = formData.get("track_expiry") === "1";
+  const unitsPerBox = unit === "box" ? Math.max(1, Number(formData.get("units_per_box") || 1)) : 1;
 
   if (!name) throw new Error("Product name is required.");
 
@@ -50,6 +51,7 @@ export async function createProductQuick(formData: FormData) {
       name,
       barcode: barcode || null,
       unit,
+      units_per_box: unitsPerBox,
       category_id: categoryId,
       supplier_id: supplierId,
       cost_price: costPrice,
