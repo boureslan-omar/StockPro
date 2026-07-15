@@ -15,9 +15,18 @@ const TABS = [
 export default async function PurchaseOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; from?: string; to?: string }>;
 }) {
-  const { status } = await searchParams;
+  const { status, from, to } = await searchParams;
+
+  function tabHref(tabStatus: string) {
+    const params = new URLSearchParams();
+    if (tabStatus) params.set("status", tabStatus);
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    const qs = params.toString();
+    return qs ? `/purchase-orders?${qs}` : "/purchase-orders";
+  }
 
   return (
     <div>
@@ -27,7 +36,7 @@ export default async function PurchaseOrdersPage({
         {TABS.map((t) => (
           <Link
             key={t.value}
-            href={t.value ? `/purchase-orders?status=${t.value}` : "/purchase-orders"}
+            href={tabHref(t.value)}
             className={`text-sm px-3 py-1.5 rounded-lg ${
               (status || "") === t.value ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900" : "border border-zinc-300 dark:border-zinc-700"
             }`}
@@ -37,8 +46,29 @@ export default async function PurchaseOrdersPage({
         ))}
       </div>
 
+      <form method="GET" className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-3 mb-4 flex flex-wrap gap-3 items-end">
+        {status && <input type="hidden" name="status" value={status} />}
+        <div className="flex-1 min-w-[160px]">
+          <label className="block text-xs text-zinc-500 mb-1">Created From</label>
+          <input type="date" name="from" defaultValue={from} className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+        </div>
+        <div className="flex-1 min-w-[160px]">
+          <label className="block text-xs text-zinc-500 mb-1">Created To</label>
+          <input type="date" name="to" defaultValue={to} className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+        </div>
+        <button className="shrink-0 rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm">Filter</button>
+        {(from || to) && (
+          <a
+            href={status ? `/purchase-orders?status=${status}` : "/purchase-orders"}
+            className="shrink-0 rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm"
+          >
+            Clear dates
+          </a>
+        )}
+      </form>
+
       <Suspense fallback={<ListSkeleton columns={7} showHeader={false} />}>
-        <PurchaseOrdersData status={status || ""} />
+        <PurchaseOrdersData status={status || ""} from={from} to={to} />
       </Suspense>
     </div>
   );

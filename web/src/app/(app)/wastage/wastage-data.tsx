@@ -144,9 +144,9 @@ export default async function WastageData({
       )}
 
       <form method="GET" className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-3 mb-4 flex flex-wrap gap-3 items-end">
-        <div>
+        <div className="flex-1 min-w-[160px]">
           <label className="block text-xs text-zinc-500 mb-1">Reason</label>
-          <select name="reason" defaultValue={reason || "all"} className="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+          <select name="reason" defaultValue={reason || "all"} className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
             <option value="all">All Reasons</option>
             {REASON_KEYS.map((r) => (
               <option key={r} value={r}>
@@ -155,19 +155,19 @@ export default async function WastageData({
             ))}
           </select>
         </div>
-        <div>
+        <div className="flex-1 min-w-[160px]">
           <label className="block text-xs text-zinc-500 mb-1">From</label>
-          <input type="date" name="from" defaultValue={from} className="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+          <input type="date" name="from" defaultValue={from} className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
         </div>
-        <div>
+        <div className="flex-1 min-w-[160px]">
           <label className="block text-xs text-zinc-500 mb-1">To</label>
-          <input type="date" name="to" defaultValue={to} className="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+          <input type="date" name="to" defaultValue={to} className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
         </div>
-        <div>
+        <div className="flex-1 min-w-[160px]">
           <label className="block text-xs text-zinc-500 mb-1">Product</label>
-          <input name="product" defaultValue={prodFilter} placeholder="Search by name…" className="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+          <input name="product" defaultValue={prodFilter} placeholder="Search by name…" className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
         </div>
-        <button className="rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm">Filter</button>
+        <button className="shrink-0 rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm">Filter</button>
       </form>
 
       <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800 pr-3">

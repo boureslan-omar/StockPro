@@ -11,12 +11,14 @@ const STATUS_STYLE: Record<string, string> = {
   in_progress: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
 };
 
+type SortKey = "date" | "discrepancy" | "shortages" | "surpluses";
+
 export default async function AuditsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string; status?: string; from?: string; to?: string; sort?: string; dir?: string }>;
 }) {
-  const { view } = await searchParams;
+  const { view, status, from, to, sort, dir } = await searchParams;
   const supabase = await createClient();
   const viewId = Number(view || 0);
 
@@ -123,18 +125,41 @@ export default async function AuditsPage({
     .order("name");
   const { data: categories } = await supabase.from("categories").select("id, name").order("name");
 
-  const { data: audits } = await supabase
-    .from("audit_sessions")
-    .select("*, audit_items(system_qty, physical_qty)")
-    .order("created_at", { ascending: false });
+  let auditQuery = supabase.from("audit_sessions").select("*, audit_items(system_qty, physical_qty)").order("created_at", { ascending: false });
+  if (status) auditQuery = auditQuery.eq("status", status);
+  if (from) auditQuery = auditQuery.gte("audit_date", from);
+  if (to) auditQuery = auditQuery.lte("audit_date", to);
+  const { data: audits } = await auditQuery;
 
-  const rows = (audits ?? []).map((a) => {
+  let rows = (audits ?? []).map((a) => {
     const items = (a.audit_items as unknown as { system_qty: number; physical_qty: number }[]) ?? [];
     const totalDiscrepancy = items.reduce((s, i) => s + Math.abs(Number(i.physical_qty) - Number(i.system_qty)), 0);
     const shortageCount = items.filter((i) => Number(i.physical_qty) < Number(i.system_qty)).length;
     const surplusCount = items.filter((i) => Number(i.physical_qty) > Number(i.system_qty)).length;
     return { ...a, item_count: items.length, total_discrepancy: totalDiscrepancy, shortage_count: shortageCount, surplus_count: surplusCount };
   });
+
+  const sortKey: SortKey = (["date", "discrepancy", "shortages", "surpluses"] as const).includes(sort as SortKey) ? (sort as SortKey) : "date";
+  const sortDir: "asc" | "desc" = dir === "asc" ? "asc" : "desc";
+  rows = [...rows].sort((a, b) => {
+    let cmp = 0;
+    if (sortKey === "date") cmp = a.audit_date < b.audit_date ? -1 : a.audit_date > b.audit_date ? 1 : 0;
+    else if (sortKey === "discrepancy") cmp = a.total_discrepancy - b.total_discrepancy;
+    else if (sortKey === "shortages") cmp = a.shortage_count - b.shortage_count;
+    else cmp = a.surplus_count - b.surplus_count;
+    return sortDir === "asc" ? cmp : -cmp;
+  });
+
+  function sortHref(key: SortKey) {
+    const params = new URLSearchParams();
+    if (status) params.set("status", status);
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    params.set("sort", key);
+    params.set("dir", sortKey === key && sortDir === "asc" ? "desc" : "asc");
+    return `/audits?${params.toString()}`;
+  }
+
 
   const productsForForm = (products ?? []).map((p) => ({
     id: p.id,
@@ -152,16 +177,60 @@ export default async function AuditsPage({
         <AuditForm products={productsForForm} categories={categories ?? []} />
       </div>
 
+      <form method="GET" className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-3 mb-4 flex flex-wrap gap-3 items-end">
+        {sort && <input type="hidden" name="sort" value={sort} />}
+        {dir && <input type="hidden" name="dir" value={dir} />}
+        <div className="flex-1 min-w-[160px]">
+          <label className="block text-xs text-zinc-500 mb-1">Status</label>
+          <select name="status" defaultValue={status || ""} className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+            <option value="">All Statuses</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed">Completed</option>
+            <option value="applied">Applied</option>
+          </select>
+        </div>
+        <div className="flex-1 min-w-[160px]">
+          <label className="block text-xs text-zinc-500 mb-1">From</label>
+          <input type="date" name="from" defaultValue={from} className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+        </div>
+        <div className="flex-1 min-w-[160px]">
+          <label className="block text-xs text-zinc-500 mb-1">To</label>
+          <input type="date" name="to" defaultValue={to} className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm" />
+        </div>
+        <button className="shrink-0 rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm">Filter</button>
+        {(status || from || to) && (
+          <a href="/audits" className="shrink-0 rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm">
+            Clear
+          </a>
+        )}
+      </form>
+
       <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800 pr-3">
         <table className="w-full text-sm bg-white dark:bg-zinc-900">
           <thead>
             <tr className="border-b border-zinc-200 dark:border-zinc-800 text-left text-zinc-500">
-              <th className="px-4 py-3 font-medium">Date</th>
+              <th className="px-4 py-3 font-medium">
+                <Link href={sortHref("date")} className="inline-flex items-center gap-1 hover:text-zinc-900 dark:hover:text-white">
+                  Date <span className="text-[10px]">{sortKey === "date" ? (sortDir === "asc" ? "▲" : "▼") : ""}</span>
+                </Link>
+              </th>
               <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 font-medium">Items</th>
-              <th className="px-4 py-3 font-medium">Shortages</th>
-              <th className="px-4 py-3 font-medium">Surpluses</th>
-              <th className="px-4 py-3 font-medium">Total Disc.</th>
+              <th className="px-4 py-3 font-medium">
+                <Link href={sortHref("shortages")} className="inline-flex items-center gap-1 hover:text-zinc-900 dark:hover:text-white">
+                  Shortages <span className="text-[10px]">{sortKey === "shortages" ? (sortDir === "asc" ? "▲" : "▼") : ""}</span>
+                </Link>
+              </th>
+              <th className="px-4 py-3 font-medium">
+                <Link href={sortHref("surpluses")} className="inline-flex items-center gap-1 hover:text-zinc-900 dark:hover:text-white">
+                  Surpluses <span className="text-[10px]">{sortKey === "surpluses" ? (sortDir === "asc" ? "▲" : "▼") : ""}</span>
+                </Link>
+              </th>
+              <th className="px-4 py-3 font-medium">
+                <Link href={sortHref("discrepancy")} className="inline-flex items-center gap-1 hover:text-zinc-900 dark:hover:text-white">
+                  Total Disc. <span className="text-[10px]">{sortKey === "discrepancy" ? (sortDir === "asc" ? "▲" : "▼") : ""}</span>
+                </Link>
+              </th>
               <th className="px-4 py-3 font-medium">Note</th>
               <th className="px-4 py-3 font-medium">Actions</th>
             </tr>

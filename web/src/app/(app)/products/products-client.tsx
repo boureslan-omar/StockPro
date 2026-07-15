@@ -30,6 +30,8 @@ export type Product = {
 
 type Option = { id: number; name: string };
 
+type SortKey = "name" | "cost_price" | "sell_price" | "stock";
+
 function generateBarcode(): string {
   // GS1 restricted-circulation prefix (20-29) reserved for in-store/internal use
   let data = "20";
@@ -53,6 +55,12 @@ export default function ProductsClient({
   const [editing, setEditing] = useState<Product | null>(null);
   const [categoryList, setCategoryList] = useState(categories);
   const [supplierList, setSupplierList] = useState(suppliers);
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [supplierFilter, setSupplierFilter] = useState("");
+  const [stockFilter, setStockFilter] = useState<"" | "low" | "out">("");
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [productSource, setProductSource] = useState<"owned" | "consignment">("owned");
   const [unit, setUnit] = useState("pcs");
   const [costPrice, setCostPrice] = useState("0");
@@ -95,16 +103,115 @@ export default function ProductsClient({
 
   const costPerBox = (parseFloat(costPrice) || 0) * (parseFloat(unitsPerBox) || 0);
 
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
+  function SortHeader({ label, sortableKey, align }: { label: string; sortableKey: SortKey; align?: "right" }) {
+    const active = sortKey === sortableKey;
+    return (
+      <th className={`px-4 py-3 font-medium ${align === "right" ? "text-right" : "text-left"}`}>
+        <button
+          type="button"
+          onClick={() => toggleSort(sortableKey)}
+          className={`inline-flex items-center gap-1 hover:text-zinc-900 dark:hover:text-white ${active ? "text-zinc-900 dark:text-white" : ""}`}
+        >
+          {label}
+          <span className="text-[10px]">{active ? (sortDir === "asc" ? "▲" : "▼") : ""}</span>
+        </button>
+      </th>
+    );
+  }
+
+  const filtered = products.filter((p) => {
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      if (!p.name.toLowerCase().includes(q) && p.barcode !== search.trim()) return false;
+    }
+    if (categoryFilter && String(p.category_id) !== categoryFilter) return false;
+    if (supplierFilter && String(p.supplier_id) !== supplierFilter) return false;
+    if (stockFilter === "low" && !(Number(p.stock) <= Number(p.low_stock_alert))) return false;
+    if (stockFilter === "out" && Number(p.stock) > 0) return false;
+    return true;
+  });
+
+  const sorted = [...filtered].sort((a, b) => {
+    const cmp = sortKey === "name" ? a.name.localeCompare(b.name) : Number(a[sortKey]) - Number(b[sortKey]);
+    return sortDir === "asc" ? cmp : -cmp;
+  });
+
   return (
     <div>
-      <div className="flex items-center justify-end gap-3 mb-6">
+      <div className="flex items-center justify-end gap-3 mb-4">
         <span className="text-sm text-zinc-500">
-          {products.length} product{products.length === 1 ? "" : "s"}
+          {filtered.length === products.length ? `${products.length} product${products.length === 1 ? "" : "s"}` : `${filtered.length} of ${products.length} products`}
         </span>
         <button onClick={openCreate} className="rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium px-4 py-2">
           + Add Product
         </button>
       </div>
+
+      {products.length > 0 && (
+        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm p-3 mb-4 flex flex-wrap gap-3 items-end">
+          <div className="flex-1 min-w-[180px]">
+            <label className="block text-xs text-zinc-500 mb-1">Search</label>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Name or barcode…"
+              className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="flex-1 min-w-[160px]">
+            <label className="block text-xs text-zinc-500 mb-1">Category</label>
+            <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+              <option value="">All Categories</option>
+              {categoryList.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex-1 min-w-[160px]">
+            <label className="block text-xs text-zinc-500 mb-1">Supplier</label>
+            <select value={supplierFilter} onChange={(e) => setSupplierFilter(e.target.value)} className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+              <option value="">All Suppliers</option>
+              {supplierList.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex-1 min-w-[160px]">
+            <label className="block text-xs text-zinc-500 mb-1">Stock</label>
+            <select value={stockFilter} onChange={(e) => setStockFilter(e.target.value as typeof stockFilter)} className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm">
+              <option value="">All Stock</option>
+              <option value="low">Low stock</option>
+              <option value="out">Out of stock</option>
+            </select>
+          </div>
+          {(search || categoryFilter || supplierFilter || stockFilter) && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearch("");
+                setCategoryFilter("");
+                setSupplierFilter("");
+                setStockFilter("");
+              }}
+              className="shrink-0 rounded-lg border border-zinc-300 dark:border-zinc-700 px-4 py-2 text-sm"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
 
       {products.length === 0 ? (
         <div className="rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 p-12 text-center text-zinc-500">
@@ -116,17 +223,24 @@ export default function ProductsClient({
             <thead>
               <tr className="border-b border-zinc-200 dark:border-zinc-800 text-left text-zinc-500">
                 <th className="px-4 py-3 font-medium">Barcode</th>
-                <th className="px-4 py-3 font-medium">Name</th>
+                <SortHeader label="Name" sortableKey="name" />
                 <th className="px-4 py-3 font-medium">Category</th>
                 <th className="px-4 py-3 font-medium">Supplier</th>
-                <th className="px-4 py-3 font-medium text-right">Cost</th>
-                <th className="px-4 py-3 font-medium text-right">Price</th>
-                <th className="px-4 py-3 font-medium text-right">Stock</th>
+                <SortHeader label="Cost" sortableKey="cost_price" align="right" />
+                <SortHeader label="Price" sortableKey="sell_price" align="right" />
+                <SortHeader label="Stock" sortableKey="stock" align="right" />
                 <th className="px-4 py-3 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {products.map((p) => {
+              {sorted.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-4 py-8 text-center text-zinc-500">
+                    No products match these filters.
+                  </td>
+                </tr>
+              )}
+              {sorted.map((p) => {
                 const low = Number(p.stock) <= Number(p.low_stock_alert);
                 return (
                   <tr key={p.id} className="border-b border-zinc-100 dark:border-zinc-800/60 last:border-0">

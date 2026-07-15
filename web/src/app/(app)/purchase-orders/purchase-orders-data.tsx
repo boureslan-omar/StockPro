@@ -8,7 +8,7 @@ import StatusSelect from "./status-select";
 import ConfirmDeleteButton from "@/components/confirm-delete-button";
 import { deletePO } from "./actions";
 
-export default async function PurchaseOrdersData({ status }: { status: string }) {
+export default async function PurchaseOrdersData({ status, from, to }: { status: string; from?: string; to?: string }) {
   const supabase = await createClient();
   const { data: suppliers } = await supabase.from("suppliers").select("id, name").order("name");
 
@@ -17,6 +17,8 @@ export default async function PurchaseOrdersData({ status }: { status: string })
     .select("*, suppliers(name, phone), purchase_order_items(count)")
     .order("created_at", { ascending: false });
   if (status) query = query.eq("status", status);
+  if (from) query = query.gte("created_at", `${from}T00:00:00`);
+  if (to) query = query.lte("created_at", `${to}T23:59:59.999`);
   const { data: orders } = await query;
 
   const rows = orders ?? [];

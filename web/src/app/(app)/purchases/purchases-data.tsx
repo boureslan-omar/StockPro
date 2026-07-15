@@ -5,16 +5,21 @@ import ViewPurchase from "./view-purchase";
 import ConfirmDeleteButton from "@/components/confirm-delete-button";
 import { deletePurchase } from "./actions";
 
-export default async function PurchasesData() {
+export default async function PurchasesData({ from, to, supplier }: { from?: string; to?: string; supplier?: string }) {
   const supabase = await createClient();
 
+  let purchasesQuery = supabase
+    .from("purchases")
+    .select("*, suppliers(name), purchase_items(count)")
+    .order("purchase_date", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(150);
+  if (from) purchasesQuery = purchasesQuery.gte("purchase_date", from);
+  if (to) purchasesQuery = purchasesQuery.lte("purchase_date", to);
+  if (supplier) purchasesQuery = purchasesQuery.eq("supplier_id", Number(supplier));
+
   const [{ data: purchases }, { data: suppliers }, { data: categories }] = await Promise.all([
-    supabase
-      .from("purchases")
-      .select("*, suppliers(name), purchase_items(count)")
-      .order("purchase_date", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(150),
+    purchasesQuery,
     supabase.from("suppliers").select("id, name").order("name"),
     supabase.from("categories").select("id, name").order("name"),
   ]);
