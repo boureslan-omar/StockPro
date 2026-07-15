@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, ShoppingCart, FileText, Package, Truck, ClipboardList,
   Building2, Users, RotateCcw, Trash2, ClipboardCheck, Receipt, Wallet,
-  BarChart3, Settings, Menu, X, Bell, ChevronLeft, ChevronRight,
+  BarChart3, Settings, Menu, X, Bell, ChevronLeft, ChevronRight, Handshake,
 } from "lucide-react";
 import LogoutButton from "@/components/logout-button";
 import OrgSwitcher from "./org-switcher";
@@ -33,6 +33,7 @@ const NAV_SECTIONS = [
       { href: "/purchases", label: "Purchases", icon: Truck },
       { href: "/purchase-orders", label: "Purchase Orders", icon: ClipboardList },
       { href: "/suppliers", label: "Suppliers", icon: Building2 },
+      { href: "/consignments", label: "Consignments", icon: Handshake },
       { href: "/wastage", label: "Wastage", icon: Trash2 },
       { href: "/audits", label: "Audits", icon: ClipboardCheck },
     ],

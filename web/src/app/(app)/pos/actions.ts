@@ -108,6 +108,21 @@ export async function processSale(formData: FormData) {
         supplier_due: supDue,
         market_profit: marketCut,
       });
+
+      // The consignment due is a real liability to the supplier from the
+      // moment it's sold, not just a number sitting in consignment_ledger —
+      // post it to the same balance/ledger a regular purchase would, so it
+      // shows up wherever the supplier's balance is shown.
+      if (consSup && supDue > 0) {
+        const { data: sup } = await supabase.from("suppliers").select("balance").eq("id", consSup).single();
+        await supabase.from("suppliers").update({ balance: Number(sup?.balance ?? 0) + supDue }).eq("id", consSup);
+        await supabase.from("supplier_ledger").insert({
+          supplier_id: consSup,
+          type: "purchase",
+          amount: supDue,
+          note: `Consignment due — Sale #${receipt}`,
+        });
+      }
     } else if (item.type === "bulk") {
       await supabase.from("sale_items").insert({
         sale_id: saleId,

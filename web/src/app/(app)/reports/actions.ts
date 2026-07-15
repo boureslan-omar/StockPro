@@ -23,6 +23,26 @@ export async function voidSale(saleId: number, reason: string) {
     if (item.is_consignment) {
       const { data: p } = await supabase.from("products").select("stock").eq("id", item.product_id).single();
       await supabase.from("products").update({ stock: Number(p?.stock ?? 0) + qty }).eq("id", item.product_id);
+
+      // Reverse the liability posted to the supplier at sale time (see
+      // pos/actions.ts). If it was already settled/paid out, this correctly
+      // goes negative — the supplier now owes that amount back.
+      const { data: ledgerRow } = await supabase
+        .from("consignment_ledger")
+        .select("supplier_id, supplier_due")
+        .eq("sale_id", saleId)
+        .eq("product_id", item.product_id)
+        .maybeSingle();
+      if (ledgerRow?.supplier_id && Number(ledgerRow.supplier_due) > 0) {
+        const { data: sup } = await supabase.from("suppliers").select("balance").eq("id", ledgerRow.supplier_id).single();
+        await supabase.from("suppliers").update({ balance: Number(sup?.balance ?? 0) - Number(ledgerRow.supplier_due) }).eq("id", ledgerRow.supplier_id);
+        await supabase.from("supplier_ledger").insert({
+          supplier_id: ledgerRow.supplier_id,
+          type: "adjustment",
+          amount: -Number(ledgerRow.supplier_due),
+          note: `Void of sale #${sale.receipt_no} (consignment)`,
+        });
+      }
       await supabase.from("consignment_ledger").delete().eq("sale_id", saleId).eq("product_id", item.product_id);
     } else if (item.product_type === "bulk") {
       // bulk has no batch tracking, nothing to restore
